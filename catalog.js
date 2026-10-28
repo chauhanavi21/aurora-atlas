@@ -545,6 +545,39 @@
         "Upper detail",
         "Fabric detail"
       ]
+    },
+    {
+      "id": "horizon",
+      "name": "Horizon Wide Leg Pants",
+      "type": "Room for a different perspective",
+      "category": "bottoms",
+      "price": 92,
+      "colors": [
+        "obsidian",
+        "navy"
+      ],
+      "description": "A wider view of the everyday. Full-length trousers with a generous leg and a flowing outline, balanced with a tucked tee or a clean knit.",
+      "features": [
+        "Wide leg",
+        "Full-length silhouette",
+        "Clean waistband"
+      ],
+      "details": "Full-length, wide-leg trousers shown on a model. Other clothing and footwear in the reference photos are styling suggestions and are not included.",
+      "fit": "A generous wide leg. Choose using your natural waist measurement; the reference model styling is illustrative.",
+      "badge": "",
+      "sizes": [
+        "XS",
+        "S",
+        "M",
+        "L",
+        "XL"
+      ],
+      "care": "Follow the original garment care label. Wash with similar colors, reshape gently, and dry away from direct heat.",
+      "gallery": [
+        "Full view",
+        "Upper detail",
+        "Fabric detail"
+      ]
     }
   ];
   const catalog = Object.fromEntries(products.map((product) => [product.id, product]));
