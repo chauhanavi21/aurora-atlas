@@ -479,6 +479,39 @@
         "Upper detail",
         "Fabric detail"
       ]
+    },
+    {
+      "id": "traverse",
+      "name": "Traverse Easy Trousers",
+      "type": "Everyday trousers, an easier pace",
+      "category": "bottoms",
+      "price": 88,
+      "colors": [
+        "obsidian",
+        "navy"
+      ],
+      "description": "For the walk to work and the longer way back. Clean-front trousers with a relaxed leg and an understated shape that pairs with almost everything.",
+      "features": [
+        "Clean front",
+        "Easy leg shape",
+        "Side pockets"
+      ],
+      "details": "Everyday trousers with a clean waistband, side pockets, and a relaxed leg that narrows toward the hem.",
+      "fit": "A relaxed leg with a neat waist. Select your size using the waist column in our concept size guide.",
+      "badge": "",
+      "sizes": [
+        "XS",
+        "S",
+        "M",
+        "L",
+        "XL"
+      ],
+      "care": "Follow the original garment care label. Wash with similar colors, reshape gently, and dry away from direct heat.",
+      "gallery": [
+        "Full view",
+        "Upper detail",
+        "Fabric detail"
+      ]
     }
   ];
   const catalog = Object.fromEntries(products.map((product) => [product.id, product]));
