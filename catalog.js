@@ -282,6 +282,39 @@
         "Upper detail",
         "Fabric detail"
       ]
+    },
+    {
+      "id": "base",
+      "name": "Base Long Sleeve",
+      "type": "The quiet foundation",
+      "price": 48,
+      "colors": [
+        "chalk",
+        "obsidian"
+      ],
+      "description": "Some pieces make getting dressed easier. A long-sleeved crew layer with a clean front and a simple outline, ready for a jacket or a day on its own.",
+      "features": [
+        "Crew neckline",
+        "Long sleeves",
+        "Clean front"
+      ],
+      "details": "A plain long-sleeved crew top with a straight body and a neat neckline. A straightforward foundation for an everyday wardrobe.",
+      "fit": "A comfortable regular fit. Choose your usual chest size; size up for a loose layering piece.",
+      "category": "essentials",
+      "badge": "",
+      "sizes": [
+        "XS",
+        "S",
+        "M",
+        "L",
+        "XL"
+      ],
+      "care": "Follow the original garment care label. Wash with similar colors, reshape gently, and dry away from direct heat.",
+      "gallery": [
+        "Full view",
+        "Upper detail",
+        "Fabric detail"
+      ]
     }
   ];
   const catalog = Object.fromEntries(products.map((product) => [product.id, product]));
