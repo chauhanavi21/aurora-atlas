@@ -1,7 +1,8 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { randomBytes, randomUUID, createHash, scryptSync, timingSafeEqual } from 'node:crypto';
+import { randomBytes, randomUUID, createHash, scryptSync, scrypt, timingSafeEqual } from 'node:crypto';
+import { promisify } from 'node:util';
 import seed from '../catalog.js';
 
 export class HttpError extends Error {
@@ -9,14 +10,33 @@ export class HttpError extends Error {
 }
 export const token = () => randomBytes(32).toString('hex');
 export const hash = (value) => createHash('sha256').update(value).digest('hex');
+const derive = promisify(scrypt);
+const passwordOptions = { N: 32768, r: 8, p: 3, maxmem: 64 * 1024 * 1024 };
+const encodedPassword = (salt, bytes) => `scrypt$32768$8$3$${salt}$${bytes.toString('hex')}`;
+function passwordParts(stored) {
+  if (typeof stored !== 'string') return null;
+  const modern = /^scrypt\$32768\$8\$3\$([a-f0-9]{64})\$([a-f0-9]{128})$/.exec(stored);
+  if (modern) return { salt: modern[1], bytes: Buffer.from(modern[2], 'hex'), options: passwordOptions };
+  const legacy = /^([a-f0-9]{64}):([a-f0-9]{128})$/.exec(stored);
+  return legacy ? { salt: legacy[1], bytes: Buffer.from(legacy[2], 'hex'), options: {} } : null;
+}
 export function passwordHash(password) {
   const salt = token();
-  return `${salt}:${scryptSync(password, salt, 64).toString('hex')}`;
+  return encodedPassword(salt, scryptSync(password, salt, 64, passwordOptions));
 }
 export function passwordMatches(password, stored) {
-  const [salt, expected] = stored.split(':');
-  const actual = scryptSync(password, salt, 64);
-  return timingSafeEqual(actual, Buffer.from(expected, 'hex'));
+  const parts = passwordParts(stored);
+  if (!parts || typeof password !== 'string' || Buffer.byteLength(password) > 512) return false;
+  return timingSafeEqual(scryptSync(password, parts.salt, 64, parts.options), parts.bytes);
+}
+export async function passwordHashAsync(password) {
+  const salt = token();
+  return encodedPassword(salt, await derive(password, salt, 64, passwordOptions));
+}
+export async function passwordMatchesAsync(password, stored) {
+  const parts = passwordParts(stored);
+  if (!parts || typeof password !== 'string' || Buffer.byteLength(password) > 512) return false;
+  return timingSafeEqual(await derive(password, parts.salt, 64, parts.options), parts.bytes);
 }
 export function text(value, name, min = 1, max = 200) {
   if (typeof value !== 'string' || value.trim().length < min || value.trim().length > max || /[\x00-\x1f\x7f]/.test(value)) throw new HttpError(400, `Enter a valid ${name}.`);
@@ -24,7 +44,9 @@ export function text(value, name, min = 1, max = 200) {
 }
 export function email(value) {
   const result = text(value, 'email address', 3, 254).toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(result)) throw new HttpError(400, 'Enter a valid email address.');
+  const [local, domain, extra] = result.split('@');
+  const labels = domain?.split('.') || [];
+  if (extra !== undefined || !local || local.length > 64 || !/^[a-z0-9.!#$%&'*+/=?^_{|}~-]+$/.test(local) || local.startsWith('.') || local.endsWith('.') || local.includes('..') || labels.length < 2 || !labels.every((label) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label)) || !/^[a-z]{2,63}$|^xn--[a-z0-9-]+$/.test(labels.at(-1))) throw new HttpError(400, 'Enter a valid email address.');
   return result;
 }
 export function integer(value, name, min, max) {
@@ -45,12 +67,21 @@ export function openStore(filename, config) {
     CREATE INDEX IF NOT EXISTS orders_created ON orders(created DESC);
     CREATE TABLE IF NOT EXISTS subscribers (email TEXT PRIMARY KEY, created INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS stripe_events (id TEXT PRIMARY KEY, created INTEGER NOT NULL);
-    CREATE TABLE IF NOT EXISTS audit_log (id INTEGER PRIMARY KEY, admin_id TEXT NOT NULL, action TEXT NOT NULL, target TEXT NOT NULL, created INTEGER NOT NULL);
-    PRAGMA user_version = 1;`);
+    CREATE TABLE IF NOT EXISTS audit_log (id INTEGER PRIMARY KEY, admin_id TEXT NOT NULL, action TEXT NOT NULL, target TEXT NOT NULL, created INTEGER NOT NULL);`);
   function transaction(work) {
     db.exec('BEGIN IMMEDIATE');
     try { const value = work(); db.exec('COMMIT'); return value; } catch (error) { db.exec('ROLLBACK'); throw error; }
   }
+  transaction(() => {
+    db.exec(`CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE COLLATE NOCASE, password_hash TEXT NOT NULL, created INTEGER NOT NULL, updated INTEGER NOT NULL, cart_version INTEGER NOT NULL DEFAULT 0);
+      CREATE TABLE IF NOT EXISTS customer_cart_items (customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE, product_id TEXT NOT NULL, color TEXT NOT NULL, size TEXT NOT NULL, quantity INTEGER NOT NULL CHECK(quantity BETWEEN 1 AND 99), PRIMARY KEY(customer_id,product_id,color,size), FOREIGN KEY(product_id,color,size) REFERENCES variants(product_id,color,size));
+      CREATE TABLE IF NOT EXISTS password_resets (token_hash TEXT PRIMARY KEY, customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE, expires INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS auth_failures (key TEXT PRIMARY KEY, attempts INTEGER NOT NULL, expires INTEGER NOT NULL);`);
+    for (const table of ['sessions', 'orders']) {
+      if (!db.prepare(`PRAGMA table_info(${table})`).all().some((column) => column.name === 'customer_id')) db.exec(`ALTER TABLE ${table} ADD COLUMN customer_id TEXT REFERENCES customers(id)`);
+    }
+    db.exec('CREATE INDEX IF NOT EXISTS orders_customer ON orders(customer_id,created DESC); CREATE UNIQUE INDEX IF NOT EXISTS orders_customer_request ON orders(customer_id,request_key) WHERE customer_id IS NOT NULL; PRAGMA user_version = 2;');
+  });
   transaction(() => {
     for (const product of seed.products) {
       db.prepare('INSERT OR IGNORE INTO products(id,data,price_cents) VALUES(?,?,?)').run(product.id, JSON.stringify(product), Math.round(product.price * 100));
@@ -63,10 +94,10 @@ export function openStore(filename, config) {
       variants: db.prepare('SELECT color,size,stock FROM variants WHERE product_id=?').all(row.id)
     }));
   }
-  function createSession(adminId = null) {
+  function createSession(adminId = null, customerId = null, lifetime = 30 * 86400000) {
     const secret = token();
-    const session = { id: hash(secret), csrf: token(), admin_id: adminId, expires: Date.now() + 30 * 86400000, cart_version: 0 };
-    db.prepare('INSERT INTO sessions(id,csrf,admin_id,expires) VALUES(?,?,?,?)').run(session.id, session.csrf, adminId, session.expires);
+    const session = { id: hash(secret), csrf: token(), admin_id: adminId, customer_id: customerId, expires: Date.now() + lifetime, cart_version: 0 };
+    db.prepare('INSERT INTO sessions(id,csrf,admin_id,customer_id,expires) VALUES(?,?,?,?,?)').run(session.id, session.csrf, adminId, customerId, session.expires);
     return { secret, session };
   }
   function getSession(secret) {
@@ -78,11 +109,17 @@ export function openStore(filename, config) {
     const taxCents = Math.round(subtotalCents * config.taxRateBps / 10000);
     return { subtotalCents, shippingCents, taxCents, totalCents: subtotalCents + shippingCents + taxCents, currency: 'usd' };
   }
+  function cartOwner(sessionId, customerId = null) {
+    customerId ||= db.prepare('SELECT customer_id FROM sessions WHERE id=?').get(sessionId)?.customer_id;
+    return customerId ? { table: 'customer_cart_items', key: 'customer_id', id: customerId, versionTable: 'customers' } : { table: 'cart_items', key: 'session_id', id: sessionId, versionTable: 'sessions' };
+  }
+  function bumpCart(owner) { db.prepare(`UPDATE ${owner.versionTable} SET cart_version=cart_version+1 WHERE id=?`).run(owner.id); }
   function cart(sessionId) {
+    const owner = cartOwner(sessionId);
     const items = db.prepare(`SELECT c.product_id AS id,c.color,c.size,c.quantity,p.data,p.price_cents AS unitPriceCents,v.stock
-      FROM cart_items c JOIN products p ON p.id=c.product_id JOIN variants v ON v.product_id=c.product_id AND v.color=c.color AND v.size=c.size WHERE c.session_id=? AND p.active=1 ORDER BY c.rowid`).all(sessionId)
+      FROM ${owner.table} c JOIN products p ON p.id=c.product_id JOIN variants v ON v.product_id=c.product_id AND v.color=c.color AND v.size=c.size WHERE c.${owner.key}=? AND p.active=1 ORDER BY c.rowid`).all(owner.id)
       .map(({ data, ...item }) => ({ ...item, name: JSON.parse(data).name }));
-    const version = db.prepare('SELECT cart_version FROM sessions WHERE id=?').get(sessionId)?.cart_version || 0;
+    const version = db.prepare(`SELECT cart_version FROM ${owner.versionTable} WHERE id=?`).get(owner.id)?.cart_version || 0;
     return { items, version, ...totals(items) };
   }
   function setCart(sessionId, items, version) {
@@ -101,9 +138,10 @@ export function openStore(filename, config) {
         if (seen.has(key)) throw new HttpError(400, 'Duplicate product options.');
         seen.add(key);
       }
-      db.prepare('DELETE FROM cart_items WHERE session_id=?').run(sessionId);
-      for (const item of items) db.prepare('INSERT INTO cart_items VALUES(?,?,?,?,?)').run(sessionId, item.id, item.color, item.size, item.quantity);
-      db.prepare('UPDATE sessions SET cart_version=cart_version+1 WHERE id=?').run(sessionId);
+      const owner = cartOwner(sessionId);
+      db.prepare(`DELETE FROM ${owner.table} WHERE ${owner.key}=?`).run(owner.id);
+      for (const item of items) db.prepare(`INSERT INTO ${owner.table} VALUES(?,?,?,?,?)`).run(owner.id, item.id, item.color, item.size, item.quantity);
+      bumpCart(owner);
       return cart(sessionId);
     });
   }
@@ -128,7 +166,8 @@ export function openStore(filename, config) {
     const method = input.paymentMethod;
     if (!['cod', 'stripe'].includes(method) || (method === 'cod' && !config.allowCod) || (method === 'stripe' && !config.stripeEnabled)) throw new HttpError(400, 'That payment method is not available.');
     return transaction(() => {
-      const previous = db.prepare('SELECT * FROM orders WHERE session_id=? AND request_key=?').get(sessionId, requestKey);
+      const customerId = db.prepare('SELECT customer_id FROM sessions WHERE id=?').get(sessionId)?.customer_id || null;
+      const previous = db.prepare('SELECT * FROM orders WHERE request_key=? AND ((customer_id IS NULL AND session_id=?) OR customer_id=?)').get(requestKey, sessionId, customerId || '');
       if (previous) return { order: publicOrder(previous), row: previous, reused: true };
       const current = cart(sessionId);
       if (current.version !== input.cartVersion) throw new HttpError(409, 'Your bag has changed. Refresh checkout and review the total.');
@@ -143,14 +182,16 @@ export function openStore(filename, config) {
       const items = current.items.map(({ stock, ...item }) => item);
       db.prepare(`INSERT INTO orders(id,reference,session_id,request_key,customer,items,subtotal_cents,shipping_cents,tax_cents,total_cents,payment_method,payment_status,status,created,updated,expires) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
         .run(id, reference, sessionId, requestKey, JSON.stringify(details), JSON.stringify(items), current.subtotalCents, current.shippingCents, current.taxCents, current.totalCents, method, method === 'cod' ? 'due_on_delivery' : 'unpaid', method === 'cod' ? 'confirmed' : 'awaiting_payment', now, now, method === 'stripe' ? now + 35 * 60000 : null);
+      db.prepare('UPDATE orders SET customer_id=? WHERE id=?').run(db.prepare('SELECT customer_id FROM sessions WHERE id=?').get(sessionId)?.customer_id || null, id);
       if (method === 'cod') clearCart(sessionId);
       const row = db.prepare('SELECT * FROM orders WHERE id=?').get(id);
       return { order: publicOrder(row), row, reused: false };
     });
   }
   function clearCart(sessionId) {
-    db.prepare('DELETE FROM cart_items WHERE session_id=?').run(sessionId);
-    db.prepare('UPDATE sessions SET cart_version=cart_version+1 WHERE id=?').run(sessionId);
+    const owner = cartOwner(sessionId);
+    db.prepare(`DELETE FROM ${owner.table} WHERE ${owner.key}=?`).run(owner.id);
+    bumpCart(owner);
   }
   function releaseOrder(row) {
     for (const item of JSON.parse(row.items)) db.prepare('UPDATE variants SET stock=stock+? WHERE product_id=? AND color=? AND size=?').run(item.quantity, item.id, item.color, item.size);
@@ -160,6 +201,8 @@ export function openStore(filename, config) {
     transaction(() => {
       for (const row of db.prepare("SELECT * FROM orders WHERE status='awaiting_payment' AND expires<?").all(Date.now())) releaseOrder(row);
       db.prepare('DELETE FROM sessions WHERE expires<?').run(Date.now());
+      db.prepare('DELETE FROM password_resets WHERE expires<?').run(Date.now());
+      db.prepare('DELETE FROM auth_failures WHERE expires<?').run(Date.now());
     });
   }
   function receiveStripe(event) {
@@ -173,12 +216,13 @@ export function openStore(filename, config) {
           const status = row.status === 'awaiting_payment' ? 'confirmed' : 'payment_review';
           db.prepare("UPDATE orders SET payment_status='paid',status=?,stripe_id=?,updated=?,expires=NULL WHERE id=?").run(status, session.id, Date.now(), row.id);
           if (status === 'confirmed') {
+            const owner = cartOwner(row.session_id, row.customer_id);
             // Remove only purchased quantities, preserving anything added while paying.
             for (const item of JSON.parse(row.items)) {
-              db.prepare('DELETE FROM cart_items WHERE session_id=? AND product_id=? AND color=? AND size=? AND quantity<=?').run(row.session_id, item.id, item.color, item.size, item.quantity);
-              db.prepare('UPDATE cart_items SET quantity=quantity-? WHERE session_id=? AND product_id=? AND color=? AND size=?').run(item.quantity, row.session_id, item.id, item.color, item.size);
+              db.prepare(`DELETE FROM ${owner.table} WHERE ${owner.key}=? AND product_id=? AND color=? AND size=? AND quantity<=?`).run(owner.id, item.id, item.color, item.size, item.quantity);
+              db.prepare(`UPDATE ${owner.table} SET quantity=quantity-? WHERE ${owner.key}=? AND product_id=? AND color=? AND size=?`).run(item.quantity, owner.id, item.id, item.color, item.size);
             }
-            db.prepare('UPDATE sessions SET cart_version=cart_version+1 WHERE id=?').run(row.session_id);
+            bumpCart(owner);
           }
         }
       }
@@ -186,5 +230,5 @@ export function openStore(filename, config) {
       db.prepare('INSERT INTO stripe_events VALUES(?,?)').run(event.id, Date.now());
     });
   }
-  return { db, products, createSession, getSession, cart, setCart, totals, placeOrder, publicOrder, releaseOrder, expireOrders, receiveStripe, transaction, colors: seed.colors, close: () => db.close() };
+  return { db, products, createSession, getSession, cart, setCart, cartOwner, bumpCart, totals, placeOrder, publicOrder, releaseOrder, expireOrders, receiveStripe, transaction, colors: seed.colors, close: () => db.close() };
 }
