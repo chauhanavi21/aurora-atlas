@@ -116,6 +116,40 @@
         "Upper detail",
         "Fabric detail"
       ]
+    },
+    {
+      "id": "range",
+      "name": "Range Oversized Tee",
+      "type": "A little more room to roam",
+      "price": 42,
+      "colors": [
+        "mist",
+        "obsidian",
+        "navy"
+      ],
+      "badge": "ROOM TO MOVE",
+      "description": "Take a little space. A generous tee with a dropped shoulder and a longer sleeve, made for slow mornings and unhurried plans.",
+      "features": [
+        "Dropped shoulder",
+        "Roomy body",
+        "Longer short sleeves"
+      ],
+      "details": "An oversized crew-neck tee with a boxy body, dropped shoulders, and wide short sleeves. Some reference photos show the fit on a model.",
+      "fit": "An oversized fit by design. Choose your usual size for the intended shape, or size down for less volume.",
+      "category": "essentials",
+      "sizes": [
+        "XS",
+        "S",
+        "M",
+        "L",
+        "XL"
+      ],
+      "care": "Follow the original garment care label. Wash with similar colors, reshape gently, and dry away from direct heat.",
+      "gallery": [
+        "Full view",
+        "Upper detail",
+        "Fabric detail"
+      ]
     }
   ];
   const catalog = Object.fromEntries(products.map((product) => [product.id, product]));
