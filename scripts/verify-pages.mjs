@@ -14,7 +14,8 @@ const catalogCode = await readFile('catalog.js', 'utf8');
 const mainCode = await readFile('main.js', 'utf8');
 const apiCode = await readFile('api.js', 'utf8');
 const state = new Map();
-const app = createApp({ ...configuration({}), databasePath: ':memory:' });
+const recoveryMessages = [];
+const app = createApp({ ...configuration({}), databasePath: ':memory:' }, { deliverReset: async (message) => { recoveryMessages.push(message); } });
 app.store.db.prepare('INSERT INTO admins VALUES(?,?,?)').run('test-owner', 'owner@example.com', passwordHash('Test-owner-password-42'));
 app.server.listen(0, '127.0.0.1'); await once(app.server, 'listening');
 const origin = `http://127.0.0.1:${app.server.address().port}`;
@@ -106,7 +107,7 @@ try {
   const sources = JSON.parse(await readFile('assets/photos/sources.json', 'utf8'));
   assert.equal(sources.length, totalPhotos);
   assert.equal(new Set(sources.map((source) => source.file)).size, totalPhotos);
-  for (const file of ['style.css', 'pages.css', 'commerce.css']) {
+  for (const file of ['style.css', 'pages.css', 'commerce.css', 'auth.css']) {
     const stylesheet = new window.CSSStyleSheet();
     stylesheet.replaceSync(await readFile(file, 'utf8'));
     assert(stylesheet.cssRules.length > 20, 'Stylesheet could not be parsed: ' + file);
@@ -302,6 +303,40 @@ try {
   assert.equal($('.add-to-bag').disabled, true);
   assert.match($('#stock-message').textContent, /sold out/);
   console.log('Connected checkout, persisted confirmation, admin login, inventory pricing, newsletter management, and sold-out options passed.');
+  const authCode = await readFile('auth.js','utf8');
+  async function loadAuth(path) { await load(path); window.eval(await readFile('auth-validation.js','utf8')); await window.eval(authCode); }
+  async function sendForm(selector) { $(selector).dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})); await idle(); }
+  await load('product.html?id=cloud'); await click('[data-size="M"]'); await submit();
+  await loadAuth('signup.html?next=https://attacker.example/');
+  input('#name','N'); input('#email','invalid'); input('#password','short'); input('#confirmPassword','different'); await sendForm('#auth-form');
+  assert.match($('#name-error').textContent,/name/); assert.match($('#email-error').textContent,/email/); assert.match($('#password-error').textContent,/12/); assert.match($('#confirmPassword-error').textContent,/match/);
+  assert.equal(app.store.db.prepare('SELECT COUNT(*) AS n FROM customers').get().n,0);
+  const initialPassword = 'Early morning trail!82', updatedPassword = 'Evening mountain air!94';
+  input('#name','Nova Sample'); input('#email','nova@example.com'); input('#password',initialPassword); input('#confirmPassword',initialPassword);
+  await click('[data-toggle-password="password"]'); assert.equal($('#password').type,'text'); await click('[data-toggle-password="password"]'); assert.equal($('#password').type,'password');
+  await sendForm('#auth-form'); assert.equal(window.location.pathname,'/account.html',$('#auth-message').textContent);
+  assert.equal(app.store.db.prepare('SELECT COUNT(*) AS n FROM customers').get().n,1);
+  await loadAuth('account.html'); assert.equal($('#account-content').hidden,false); assert.match($('#account-heading').textContent,/Nova/); assert.equal($('.account-label').textContent,'Account');
+  assert.equal($$('.account-order').length,1,'The current guest order should be claimed by the new account');
+  assert.equal($('.bag-count').textContent,'1','Signing up preserves the guest bag');
+  input('#name','Nova Updated'); await sendForm('#profile-form'); assert.match($('#auth-success').textContent,/saved/);
+  input('#currentPassword',initialPassword); input('#newPassword','short'); input('#confirmPassword','different'); await sendForm('#password-form'); assert.match($('#newPassword-error').textContent,/12/);
+  input('#newPassword',updatedPassword); input('#confirmPassword',updatedPassword); await sendForm('#password-form'); assert.match($('#auth-success').textContent,/other devices/); assert.equal($('#newPassword').value,'');
+  await click('#account-logout'); assert.equal(window.location.pathname,'/index.html');
+  await loadAuth('account.html'); assert.equal(window.location.pathname,'/login.html'); assert.equal($('#account-content').hidden,true);
+  await loadAuth('login.html?next=checkout.html'); input('#email','nova@example.com'); input('#password','Wrong password!123'); await sendForm('#auth-form'); assert.match($('#auth-message').textContent,/incorrect/);
+  input('#password',updatedPassword); await sendForm('#auth-form'); assert.equal(window.location.pathname,'/checkout.html');
+  await load('checkout.html'); await window.eval(await readFile('checkout.js','utf8')); assert.equal($('#checkout-form [name=name]').value,'Nova Updated'); assert.equal($('#checkout-form [name=email]').value,'nova@example.com'); assert.match($('#checkout-account').textContent,/Signed in/);
+  for (const [name,value] of Object.entries({address1:'123 Sample Street',city:'Austin',state:'TX',postalCode:'78701'})) input(`#checkout-form [name="${name}"]`,value,'change');
+  await sendForm('#checkout-form'); assert.equal(window.location.pathname,'/order.html');
+  await loadAuth('account.html'); assert.equal($$('.account-order').length,2); await click('#account-logout');
+  await loadAuth('forgot-password.html'); input('#email','nova@example.com'); await sendForm('#auth-form'); assert.match($('#auth-success').textContent,/recovery message/); assert.equal(recoveryMessages.length,1);
+  const resetUrl = recoveryMessages[0].resetUrl;
+  await loadAuth(resetUrl); assert.equal(window.location.hash,'','The reset token must be removed from the visible URL');
+  const resetPassword = 'Golden afternoon walk!56'; input('#newPassword',resetPassword); input('#confirmPassword',resetPassword); await sendForm('#auth-form'); assert.equal(window.location.pathname,'/login.html');
+  await loadAuth('login.html?reset=success'); assert.match($('#auth-success').textContent,/updated/); input('#email','nova@example.com'); input('#password',resetPassword); await sendForm('#auth-form'); assert.equal(window.location.pathname,'/account.html');
+  for (let i=0;i<window.localStorage.length;i++) assert(![initialPassword,updatedPassword,resetPassword].some((password)=>window.localStorage.getItem(window.localStorage.key(i)).includes(password)));
+  console.log('Signup validation, password visibility, safe redirects, account orders, profile changes, password changes, logout, login, checkout identity, and local recovery passed.');
   console.log('All DOM and local-asset checks passed against an isolated real API. Browser visual checks are a separate step.');
 } finally {
   await window?.happyDOM.abort();
