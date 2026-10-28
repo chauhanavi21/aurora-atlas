@@ -1,33 +1,15 @@
-/* Aurora Atlas — independent, dependency-free storefront with procedural Three.js equipment. */
+/* Shared storefront behavior. Real photos are used everywhere customers shop. */
 (() => {
   'use strict';
-
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
+  const { products, catalog, colors, photo, productUrl } = window.AuroraCatalog;
+  const page = document.body.dataset.page || 'home';
+  const params = new URLSearchParams(location.search);
+  const categories = { all: 'All equipment', outerwear: 'Outerwear', essentials: 'Essentials', accessories: 'Accessories' };
   const money = (amount) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
-  const colors = {
-    glacier: { name: 'Glacier', hex: '#c4c9bd' },
-    obsidian: { name: 'Obsidian', hex: '#353c38' },
-    moss: { name: 'Moss', hex: '#63704d' },
-    chalk: { name: 'Chalk', hex: '#bdb5a2' },
-    shale: { name: 'Shale', hex: '#7a8174' }
-  };
-  const products = [
-    { id: 'boreal', name: 'Boreal Puffer', type: 'Insulated everyday outerwear', category: 'outerwear', price: 245, badge: 'THE SIGNATURE', colors: ['glacier', 'obsidian', 'moss'], sizes: ['XS', 'S', 'M', 'L', 'XL'], description: 'Your warmest layer. Your lightest decision. A sculpted, water-repellent shell with recycled insulation, a stand collar, and fleece-lined pockets. Built for cold starts and unplanned adventures.' },
-    { id: 'drift', name: 'Drift Fleece', type: 'Your go-everywhere midlayer', category: 'essentials', price: 115, badge: 'NEW TERRITORY', colors: ['moss', 'chalk', 'obsidian'], sizes: ['XS', 'S', 'M', 'L', 'XL'], description: 'Soft on the inside. Ready for the outside. A substantial recycled fleece with a relaxed fit, a high zip collar, and a utility chest pocket. Wear it as a midlayer or make it your everyday uniform.' },
-    { id: 'terrain', name: 'Terrain Vest', type: 'Lightweight. Limitless.', category: 'outerwear', price: 165, badge: '', colors: ['obsidian', 'moss', 'glacier'], sizes: ['XS', 'S', 'M', 'L', 'XL'], description: 'A little warmth goes a long way. Our insulated vest brings a quilted recycled shell, a protective stand collar, and zip pockets to the art of layering. Made to move with you, wherever the day goes.' },
-    { id: 'transit', name: 'Transit Crossbody', type: 'Carry less. Go further.', category: 'accessories', price: 65, badge: 'EVERYDAY ESSENTIAL', colors: ['moss', 'obsidian', 'shale'], sizes: ['ONE SIZE'], description: 'Everything you need. Nothing in your way. A compact, weather-resistant crossbody with an adjustable woven strap, a secure zip compartment, and just enough room for your daily essentials. Capacity: 3 liters.' }
-  ];
-  const catalog = Object.fromEntries(products.map((product) => [product.id, product]));
-  const assets = new Map();
-  let activeFilter = 'all';
-  let selectedProduct = null;
-  let selectedColor = 'glacier';
-  let selectedSize = null;
-  let heroColor = 'glacier';
-  let toastTimer;
-  let renderProductImage = null;
-  let updateHeroModel = () => {};
+  let activeFilter = Object.hasOwn(categories, params.get('category')) ? params.get('category') : 'all';
+  let selectedProduct = null, selectedColor = null, selectedSize = null, galleryIndex = 0, toastTimer;
 
   function readSaved(key, fallback) {
     try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
@@ -36,70 +18,143 @@
     try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch { return false; }
   }
   let bag = readSaved('aurora-atlas-bag-v1', []);
-  bag = Array.isArray(bag) ? bag.filter((item) => item && catalog[item.id] && catalog[item.id].colors.includes(item.color) && catalog[item.id].sizes.includes(item.size) && Number.isInteger(item.quantity) && item.quantity > 0 && item.quantity <= 99) : [];
+  bag = Array.isArray(bag) ? bag.filter((item) => item && Object.hasOwn(catalog, item.id) && catalog[item.id].colors.includes(item.color) && catalog[item.id].sizes.includes(item.size) && Number.isInteger(item.quantity) && item.quantity > 0 && item.quantity <= 99) : [];
 
-  // Code-native vector fallbacks keep the collection usable without a GPU.
-  function fallbackImage(product, color) {
-    const c = colors[color].hex;
-    const jacket = `<path d="m150 115 29-28h62l29 28 38 18 53 169-48 20-38-105v177H145V217l-38 105-48-20 53-169Z" fill="url(#fabric)" stroke="#10180e" stroke-width="3"/><path d="M210 88v307M150 166h120M145 211h130M145 256h130M145 301h130M145 346h130M175 89v46h70V89" fill="none" stroke="#11180f" stroke-opacity=".5" stroke-width="4"/>`;
-    const vest = `<path d="m155 110 28-22h54l28 22-14 60 25 34v189H144V204l25-34Z" fill="url(#fabric)" stroke="#10180e" stroke-width="4"/><path d="M210 90v303M146 215h128M146 260h128M146 305h128M146 350h128M180 91v43h60V91" fill="none" stroke="#11180f" stroke-opacity=".65" stroke-width="5"/>`;
-    const fleece = `<path d="m151 117 32-26h54l32 26 36 17 48 178-43 15-38-110v177H148V217l-38 110-43-15 48-178Z" fill="url(#fabric)" stroke="#10180e" stroke-width="3"/><path d="M210 94v302M179 93v50h62V93M229 177h29v46h-29Z" fill="none" stroke="#263020" stroke-width="5"/>`;
-    const carry = `<path d="M132 200c-2-109 142-121 155-11" fill="none" stroke="#303a25" stroke-width="24"/><rect x="92" y="200" width="238" height="146" rx="37" fill="url(#fabric)" stroke="#10180e" stroke-width="5"/><rect x="112" y="242" width="196" height="78" rx="16" fill="none" stroke="#27351d" stroke-width="5"/><path d="M120 252h181" stroke="#121a0e" stroke-width="5"/>`;
-    const shape = product.id === 'transit' ? carry : product.id === 'terrain' ? vest : product.id === 'drift' ? fleece : jacket;
-    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="420" height="460" viewBox="0 0 420 460"><defs><linearGradient id="fabric" x1="0" x2="1" y2=".7"><stop stop-color="${c}"/><stop offset=".6" stop-color="${c}"/><stop offset="1" stop-color="#222d1e"/></linearGradient></defs><g transform="rotate(-6 210 230)">${shape}<rect x="228" y="174" width="22" height="12" rx="1" fill="#bde177"/><path d="m234 183 5-7 5 7" fill="none" stroke="#26321d" stroke-width="2"/></g></svg>`);
+  function mountSharedLayout() {
+    if ($('[data-site-header]')) $('[data-site-header]').innerHTML = `
+      <div class="announcement"><span>LESS FORECAST. MORE POSSIBILITY.</span><span>Complimentary shipping on orders $150+ <span aria-hidden="true">↗</span></span><span>DESIGNED TO GO FURTHER.</span></div>
+      <header class="site-header"><a class="brand" href="index.html" aria-label="Aurora Atlas home"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M5 30 17 8h6l12 22H22l-2-5-3 5Zm10-7h10L20 13Z" fill="currentColor"/></svg><span>AURORA<span class="brand-second">ATLAS<span class="brand-dot">®</span></span></span></a><nav class="desktop-nav" aria-label="Main navigation"><a href="shop.html" data-nav-filter="all">Shop all <span>↗</span></a><a href="shop.html?category=outerwear" data-nav-filter="outerwear">Outerwear</a><a href="shop.html?category=essentials" data-nav-filter="essentials">Essentials</a><a href="index.html#our-world">Our world</a></nav><div class="header-actions"><span class="location">EARTH, EST. 2024</span><button class="icon-button search-trigger" aria-label="Search collection"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg></button><button class="bag-trigger" aria-label="Open shopping bag">Bag <span class="bag-count">0</span></button><button class="icon-button mobile-menu-trigger" aria-label="Open menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16M4 16h16"/></svg></button></div></header><nav class="mobile-nav" aria-label="Mobile navigation" hidden><a href="shop.html">Shop all ↗</a><a href="shop.html?category=outerwear">Outerwear</a><a href="shop.html?category=essentials">Essentials</a><a href="shop.html?category=accessories">Accessories</a><a href="index.html#our-world">Our world</a></nav>`;
+    if ($('[data-site-footer]')) $('[data-site-footer]').innerHTML = `
+      <footer class="site-footer section-wrap"><div class="footer-top"><a class="brand footer-brand" href="index.html">AURORA ATLAS<span>®</span></a><span>EQUIPMENT FOR THE EVERYDAY EXPLORER.</span><a href="#">BACK TO TOP ↑</a></div><div class="footer-bottom"><span>© 2026 Aurora Atlas</span><div><button data-info="shipping">Shipping & returns</button><button data-info="care">Product care</button><button data-info="contact">Get in touch</button></div><span>DESIGNED WITH INTENTION. WORN WITH CURIOSITY.</span></div></footer>`;
+    if (!$('#bag-dialog')) document.body.insertAdjacentHTML('beforeend', `
+      <dialog id="bag-dialog" class="bag-dialog" aria-labelledby="bag-heading"><div class="bag-heading"><h2 id="bag-heading">Your bag <span id="bag-total-count">(0)</span></h2><button class="icon-button" data-close aria-label="Close shopping bag">×</button></div><div id="bag-items"></div><div id="bag-summary" hidden><p class="shipping-progress" id="shipping-progress"></p><div class="subtotal"><span>Subtotal</span><span id="bag-subtotal"></span></div><p class="checkout-note">Shipping calculated at checkout.</p><button class="button button-lime" id="checkout-trigger">Continue to checkout <span>↗</span></button></div></dialog>`);
+    if (!$('#info-dialog')) document.body.insertAdjacentHTML('beforeend', '<dialog id="info-dialog" class="info-dialog" aria-labelledby="info-title"><button class="dialog-close icon-button" data-close aria-label="Close information">×</button><p class="eyebrow">AURORA ATLAS / GOOD TO KNOW</p><h2 id="info-title"></h2><div id="info-body"></div></dialog>');
+    if (!$('#toast')) document.body.insertAdjacentHTML('beforeend', '<div id="toast" class="toast" role="status" aria-live="polite"></div>');
   }
-  function productImage(product, color) {
-    const key = `${product.id}-${color}`;
-    if (!assets.has(key)) assets.set(key, renderProductImage ? renderProductImage(product, color) : fallbackImage(product, color));
-    return assets.get(key);
-  }
+  mountSharedLayout();
+
   function toast(message) {
     clearTimeout(toastTimer);
     $('#toast').textContent = message;
     $('#toast').classList.add('visible');
     toastTimer = setTimeout(() => $('#toast').classList.remove('visible'), 3200);
   }
+  function showInfo(title, body) {
+    $('#info-title').textContent = title;
+    $('#info-body').innerHTML = body;
+    $('#info-dialog').showModal();
+  }
+  function card(product) {
+    return `<article class="product-card"><a class="product-art photo-art" href="${productUrl(product)}" data-product="${product.id}" aria-label="View ${product.name}">${product.badge ? `<span class="product-badge ${product.id === 'drift' ? 'new' : ''}">${product.badge}</span>` : ''}<img src="${photo(product)}" alt="${product.name} in ${colors[product.colors[0]].name}, actual garment photograph" width="1200" height="1600" loading="lazy"><span class="product-index">AA / ${String(products.indexOf(product) + 1).padStart(3, '0')}</span><span class="card-plus" aria-hidden="true">↗</span></a><div class="product-meta"><h3><a href="${productUrl(product)}">${product.name}</a></h3><span>${money(product.price)}</span></div><p class="product-type">${product.type}</p><div class="card-colors">${product.colors.map((color) => `<a href="${productUrl(product, color)}" style="--swatch:${colors[color].hex}" aria-label="${product.name} in ${colors[color].name}" title="${colors[color].name}"></a>`).join('')}<small>${product.colors.length} colors</small></div></article>`;
+  }
+  function syncShopUrl() {
+    if (page !== 'shop') return;
+    const query = new URLSearchParams();
+    if (activeFilter !== 'all') query.set('category', activeFilter);
+    const search = $('#product-search').value.trim();
+    if (search) query.set('q', search);
+    if ($('#product-sort').value !== 'featured') query.set('sort', $('#product-sort').value);
+    const url = new URL(location.href); url.search = query.toString();
+    history.replaceState(null, '', url);
+  }
   function renderCollection() {
+    if (!$('#product-grid')) return;
     const query = $('#product-search').value.trim().toLowerCase();
     const visible = products.filter((product) => (activeFilter === 'all' || product.category === activeFilter) && `${product.name} ${product.type} ${product.category}`.toLowerCase().includes(query));
-    $('#product-grid').innerHTML = visible.map((product) => `<article class="product-card"><button class="product-art" data-product="${product.id}" aria-label="Shop ${product.name}">${product.badge ? `<span class="product-badge ${product.id === 'drift' ? 'new' : ''}">${product.badge}</span>` : ''}<img src="${productImage(product, product.colors[0])}" alt="${product.name} in ${colors[product.colors[0]].name}" width="420" height="460"><span class="product-index">AA / ${String(products.indexOf(product) + 1).padStart(3, '0')}</span><span class="card-plus" aria-hidden="true">+</span></button><div class="product-meta"><h3><button data-product="${product.id}">${product.name}</button></h3><span>${money(product.price)}</span></div><p class="product-type">${product.type}</p><div class="card-colors" aria-label="${product.colors.length} colors available">${product.colors.map((color) => `<span style="--swatch:${colors[color].hex}"></span>`).join('')}<small>${product.colors.length} colors</small></div></article>`).join('');
+    const sort = $('#product-sort')?.value;
+    if (sort === 'price-low') visible.sort((a, b) => a.price - b.price);
+    if (sort === 'price-high') visible.sort((a, b) => b.price - a.price);
+    if (sort === 'name') visible.sort((a, b) => a.name.localeCompare(b.name));
+    $('#product-grid').innerHTML = visible.map(card).join('');
     $('#no-results').hidden = visible.length > 0;
     $('.collection-count').textContent = `${visible.length} considered essential${visible.length === 1 ? '' : 's'}`;
+    if ($('#results-title')) $('#results-title').textContent = categories[activeFilter];
     $$('[data-filter]').forEach((button) => {
       const active = button.dataset.filter === activeFilter;
-      button.classList.toggle('selected', active);
-      button.setAttribute('aria-pressed', String(active));
+      button.classList.toggle('selected', active); button.setAttribute('aria-pressed', String(active));
     });
+    $$('.desktop-nav [data-nav-filter]').forEach((link) => {
+      const active = (page === 'shop' || page === 'home') && link.dataset.navFilter === activeFilter;
+      link.classList.toggle('active', active);
+      if (active) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
+    });
+    syncShopUrl();
   }
-  function filterCollection(filter) {
-    activeFilter = filter;
-    renderCollection();
-    $$('.desktop-nav a').forEach((link) => link.classList.toggle('active', link.dataset.navFilter === filter));
+  if ($('#product-search')) {
+    $('#product-search').value = params.get('q') || '';
+    $('#product-search').addEventListener('input', renderCollection);
   }
-  function showProduct(id) {
+  if ($('#product-sort')) {
+    const requestedSort = params.get('sort');
+    if (['featured', 'price-low', 'price-high', 'name'].includes(requestedSort)) $('#product-sort').value = requestedSort;
+    $('#product-sort').addEventListener('change', renderCollection);
+  }
+
+  function renderProduct() {
+    const id = params.get('id') || 'boreal';
+    if (!Object.hasOwn(catalog, id)) {
+      document.title = 'Equipment not found — Aurora Atlas';
+      $('#product-content').innerHTML = '<section class="product-not-found"><p class="eyebrow">A SMALL DETOUR / 404</p><h1>This trail ends here<span class="accent">.</span></h1><p>That piece is not in the current collection. Your next essential is still out there.</p><a href="shop.html" class="button button-lime">Explore the collection <span>↗</span></a></section>';
+      return;
+    }
     selectedProduct = catalog[id];
-    if (!selectedProduct) return;
-    selectedColor = id === 'boreal' ? heroColor : selectedProduct.colors[0];
+    selectedColor = selectedProduct.colors.includes(params.get('color')) ? params.get('color') : selectedProduct.colors[0];
     selectedSize = selectedProduct.sizes.length === 1 ? 'ONE SIZE' : null;
-    $('#detail-title').textContent = selectedProduct.name;
-    $('#detail-category').textContent = `AA / ${selectedProduct.category.toUpperCase()}`;
-    $('#detail-price').textContent = money(selectedProduct.price);
-    $('#detail-description').textContent = selectedProduct.description;
-    $('#size-fieldset').hidden = selectedProduct.sizes.length === 1;
-    $('#detail-sizes').innerHTML = selectedProduct.sizes.map((size) => `<button type="button" data-size="${size}" aria-pressed="false">${size}</button>`).join('');
-    updateDetailColor();
-    $('#product-dialog').showModal();
+    document.title = `${selectedProduct.name} — Aurora Atlas`;
+    $('meta[name="description"]').content = selectedProduct.description;
+    const p = selectedProduct;
+    $('#product-content').innerHTML = `
+      <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span aria-hidden="true">/</span><a href="shop.html">All equipment</a><span aria-hidden="true">/</span><a href="shop.html?category=${p.category}">${categories[p.category]}</a><span aria-hidden="true">/</span><span>${p.name}</span></nav>
+      <section class="product-layout" aria-labelledby="detail-title"><div class="product-gallery"><div class="gallery-photo"><span class="gallery-badge">${p.badge || 'THE EVERYDAY EDIT'}</span><button id="gallery-zoom" aria-label="Enlarge product photo"><img id="detail-image" src="${photo(p, selectedColor)}" alt="${p.name} in ${colors[selectedColor].name}, full view" width="1200" height="1600" fetchpriority="high"></button><span class="gallery-photo-index" id="gallery-count">01 / 03</span><span class="zoom-hint" aria-hidden="true">+ CLICK TO GET CLOSER</span></div><div class="gallery-controls"><div id="gallery-thumbnails" class="gallery-thumbnails" role="group" aria-label="Product photo gallery">${p.gallery.map((label, index) => `<button data-gallery-index="${index}" class="${index === 0 ? 'selected' : ''}" aria-label="${label}" aria-pressed="${index === 0}"><img src="${photo(p, selectedColor)}" alt="" data-view="${index}" width="90" height="120"><span>${label}</span></button>`).join('')}</div><div class="gallery-arrows"><button class="icon-button" data-gallery-step="-1" aria-label="Previous product photo">←</button><button class="icon-button" data-gallery-step="1" aria-label="Next product photo">→</button></div></div><p class="photo-reference">Concept collection · Reference product photography. Detail views are close-up crops.</p></div>
+      <div class="product-purchase"><p class="eyebrow">AA / ${p.category.toUpperCase()} / 00${products.indexOf(p) + 1}</p><h1 id="detail-title">${p.name}</h1><p class="product-subtitle">${p.type}</p><p id="detail-price" class="product-page-price">${money(p.price)} <span>USD</span></p><p class="product-page-description">${p.description}</p><div class="feature-tags">${p.features.map((feature) => `<span>${feature}</span>`).join('')}</div><form id="product-form"><fieldset><legend>Color — <span id="detail-color-name">${colors[selectedColor].name}</span></legend><div id="detail-colors" class="detail-colors"></div></fieldset><fieldset id="size-fieldset" ${p.sizes.length === 1 ? 'hidden' : ''}><legend><span>Choose your size</span><button type="button" id="size-guide-trigger">Size guide ↗</button></legend><div id="detail-sizes" class="size-options">${p.sizes.map((size) => `<button type="button" data-size="${size}" aria-pressed="false">${size}</button>`).join('')}</div><p class="size-note">A relaxed, unisex fit. Make room for the everyday.</p><p id="size-error" class="form-error" role="alert" hidden>Choose a size before adding this piece to your bag.</p></fieldset><div class="purchase-row"><div class="purchase-quantity"><button type="button" data-purchase-step="-1" aria-label="Decrease quantity">−</button><label class="sr-only" for="product-quantity">Quantity</label><input id="product-quantity" type="number" min="1" max="99" step="1" value="1" required><button type="button" data-purchase-step="1" aria-label="Increase quantity">+</button></div><button type="submit" class="button button-lime add-to-bag">Add to bag <span>↗</span></button></div></form><div class="product-delivery"><span>↗ <span>Complimentary shipping<br><small>On orders $150 and over</small></span></span><span>↺ <span>Take your time<br><small>30 days to find your fit</small></span></span></div><div class="product-accordions"><details open><summary>The details <span>+</span></summary><p>${p.details}</p></details><details><summary>Fit & sizing <span>+</span></summary><p>${p.fit}</p></details><details><summary>Care for your equipment <span>+</span></summary><p>${p.care}</p></details><details><summary>Shipping & returns <span>+</span></summary><p>Our planned policy includes complimentary shipping on orders $150+ and returns within 30 days. This concept collection is not currently available for fulfillment.</p></details></div></div></section>
+      <section class="product-detail-story"><div><p class="eyebrow">PURPOSE IN EVERY PIECE</p><h2>All the detail.<br>None of the excess.</h2></div><div>${p.features.map((feature, index) => `<div><span>0${index + 1}</span><h3>${feature}</h3></div>`).join('')}</div></section><section class="related-products" aria-labelledby="related-heading"><div class="section-heading"><div><p class="eyebrow">GOOD COMPANY FOR YOUR NEXT CHAPTER</p><h2 id="related-heading">Better together.</h2></div><a href="shop.html" class="text-link">Explore all equipment <span>↗</span></a></div><div class="product-grid">${products.filter((item) => item.id !== p.id).map(card).join('')}</div></section>`;
+    updateProductColor(false);
+    $('#product-form').addEventListener('submit', addToBag);
+    $('#gallery-zoom').addEventListener('click', () => { updateGallery(); $('#image-dialog').showModal(); });
+    $('.product-gallery').addEventListener('keydown', galleryKeys);
+    $('#image-dialog').addEventListener('keydown', galleryKeys);
+    $$('.desktop-nav [data-nav-filter]').forEach((link) => { if (link.dataset.navFilter === p.category) { link.classList.add('active'); link.setAttribute('aria-current', 'page'); } });
   }
-  function updateDetailColor() {
+  function galleryKeys(event) {
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      event.preventDefault(); galleryIndex = (galleryIndex + (event.key === 'ArrowLeft' ? -1 : 1) + 3) % 3; updateGallery();
+    }
+  }
+  function updateGallery() {
+    if (!selectedProduct) return;
+    const label = selectedProduct.gallery[galleryIndex];
+    $('#detail-image').dataset.view = galleryIndex;
+    $('#detail-image').alt = `${selectedProduct.name} in ${colors[selectedColor].name}, ${label.toLowerCase()}`;
+    $('#gallery-count').textContent = `0${galleryIndex + 1} / 03`;
+    $$('[data-gallery-index]').forEach((button) => { const active = Number(button.dataset.galleryIndex) === galleryIndex; button.classList.toggle('selected', active); button.setAttribute('aria-pressed', String(active)); });
+    $('#zoom-image').src = photo(selectedProduct, selectedColor);
+    $('#zoom-image').alt = $('#detail-image').alt;
+    $('#zoom-image').dataset.view = galleryIndex;
+    $('#zoom-caption').textContent = `${selectedProduct.name} / ${colors[selectedColor].name} / ${label}`;
+  }
+  function updateProductColor(updateUrl = true) {
     $('#detail-color-name').textContent = colors[selectedColor].name;
-    $('#detail-image').src = productImage(selectedProduct, selectedColor);
-    $('#detail-image').alt = `${selectedProduct.name} in ${colors[selectedColor].name}`;
-    $('#detail-colors').innerHTML = selectedProduct.colors.map((color) => `<button type="button" class="color-button ${color === selectedColor ? 'selected' : ''}" style="--swatch:${colors[color].hex}" data-detail-color="${color}" aria-label="${colors[color].name}" aria-pressed="${color === selectedColor}"></button>`).join('');
+    $('#detail-image').src = photo(selectedProduct, selectedColor);
+    $$('#gallery-thumbnails img').forEach((image) => { image.src = photo(selectedProduct, selectedColor); });
+    $('#detail-colors').innerHTML = selectedProduct.colors.map((color) => `<button type="button" class="product-color-option ${color === selectedColor ? 'selected' : ''}" data-detail-color="${color}" aria-label="${colors[color].name}" aria-pressed="${color === selectedColor}"><span style="--swatch:${colors[color].hex}"></span><span>${colors[color].name}</span></button>`).join('');
+    galleryIndex = 0; updateGallery();
+    if (updateUrl) { const url = new URL(location.href); url.searchParams.set('color', selectedColor); history.replaceState(null, '', url); }
+  }
+  function addToBag(event) {
+    event.preventDefault();
+    if (!selectedSize) { $('#size-error').hidden = false; $('#detail-sizes button').focus(); return; }
+    const quantity = Number($('#product-quantity').value);
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) return;
+    const item = bag.find((entry) => entry.id === selectedProduct.id && entry.color === selectedColor && entry.size === selectedSize);
+    if (item && item.quantity + quantity > 99) { toast('The limit is 99 of each piece. Adjust your bag quantity to add more.'); return; }
+    if (item) item.quantity += quantity;
+    else bag.push({ id: selectedProduct.id, color: selectedColor, size: selectedSize, quantity });
+    updateBag(); $('#bag-dialog').showModal(); toast(`${selectedProduct.name} added to your bag.`);
   }
   function updateBag() {
     const count = bag.reduce((sum, item) => sum + item.quantity, 0);
     const subtotal = bag.reduce((sum, item) => sum + catalog[item.id].price * item.quantity, 0);
-    $('.bag-count').textContent = count;
+    $('.bag-count').textContent = String(count);
     $('.bag-trigger').setAttribute('aria-label', `Open shopping bag, ${count} item${count === 1 ? '' : 's'}`);
     $('#bag-total-count').textContent = `(${count})`;
     $('#bag-summary').hidden = !bag.length;
@@ -107,353 +162,76 @@
     $('#shipping-progress').textContent = subtotal >= 150 ? 'Your equipment ships on us. Complimentary shipping unlocked.' : `${money(150 - subtotal)} away from complimentary shipping.`;
     $('#bag-items').innerHTML = bag.length ? bag.map((item, index) => {
       const product = catalog[item.id];
-      return `<div class="bag-item"><img src="${productImage(product, item.color)}" alt="${product.name} in ${colors[item.color].name}"><div class="bag-item-info"><h3>${product.name}</h3><p>${colors[item.color].name} / ${item.size}</p><span class="bag-item-price">${money(product.price * item.quantity)}</span><button class="bag-item-remove" data-remove="${index}" aria-label="Remove ${product.name}">×</button><div class="quantity-control"><button data-quantity="${index}" data-change="-1" aria-label="Decrease ${product.name} quantity">−</button><span aria-label="Quantity">${item.quantity}</span><button data-quantity="${index}" data-change="1" aria-label="Increase ${product.name} quantity" ${item.quantity >= 99 ? 'disabled' : ''}>+</button></div></div></div>`;
-    }).join('') : '<div class="bag-empty"><span aria-hidden="true">↗</span><h3>A little room for possibility.</h3><p>Your next everyday essential is out there.</p><button class="button button-lime" id="empty-bag-shop">Explore the collection <span>↗</span></button></div>';
+      return `<div class="bag-item"><a href="${productUrl(product, item.color)}"><img src="${photo(product, item.color)}" alt="${product.name} in ${colors[item.color].name}"></a><div class="bag-item-info"><h3><a href="${productUrl(product, item.color)}">${product.name}</a></h3><p>${colors[item.color].name} / ${item.size}</p><span class="bag-item-price">${money(product.price * item.quantity)}</span><button class="bag-item-remove" data-remove="${index}" aria-label="Remove ${product.name}">×</button><div class="quantity-control"><button data-quantity="${index}" data-change="-1" aria-label="Decrease ${product.name} quantity">−</button><span aria-label="Quantity">${item.quantity}</span><button data-quantity="${index}" data-change="1" aria-label="Increase ${product.name} quantity" ${item.quantity >= 99 ? 'disabled' : ''}>+</button></div></div></div>`;
+    }).join('') : '<div class="bag-empty"><span aria-hidden="true">↗</span><h3>A little room for possibility.</h3><p>Your next everyday essential is out there.</p><a class="button button-lime" href="shop.html">Explore the collection <span>↗</span></a></div>';
     save('aurora-atlas-bag-v1', bag);
   }
-  function showInfo(title, body) {
-    $('#info-title').textContent = title;
-    $('#info-body').innerHTML = body;
-    $('#info-dialog').showModal();
-  }
-
+  const information = {
+    shipping: ['A little peace of mind.', '<p>Our planned shipping policy includes complimentary standard shipping on orders of $150 or more, and 30-day returns on unworn equipment with original tags.</p><p>Aurora Atlas is a concept store. Shipping and order fulfillment will be available when the store launches.</p>'],
+    care: ['Keep your equipment going.', '<p>Wash cold and follow the care label supplied with your garment. Air dry fleece and spot clean carry goods. The product pages include more specific care information for each piece.</p>'],
+    contact: ['Good conversations start here.', '<p>This is a concept collection, so a customer support inbox is not connected yet. Our product pages, size guide, and care notes can help you get to know the equipment.</p>'],
+    size: ['Find your fit.', '<p>Use your body measurements, in centimeters, to find your size. Measure around the fullest part of your chest and your natural waist. This is a concept sizing guide; follow the supplier’s measurements for production garments.</p><table><thead><tr><th>Size</th><th>Chest</th><th>Waist</th></tr></thead><tbody><tr><td>XS</td><td>80–87</td><td>64–71</td></tr><tr><td>S</td><td>88–95</td><td>72–79</td></tr><tr><td>M</td><td>96–103</td><td>80–87</td></tr><tr><td>L</td><td>104–111</td><td>88–95</td></tr><tr><td>XL</td><td>112–119</td><td>96–103</td></tr></tbody></table>'],
+    checkout: ['Your next step.', '<p>This is a concept storefront. Your bag is saved in this browser, but online checkout and payments are not connected yet.</p><p>No order has been placed and no payment has been taken. You can keep exploring and editing your bag.</p>']
+  };
   document.addEventListener('click', (event) => {
-    const target = event.target.closest('button,a');
-    if (!target) return;
-    if (target.hasAttribute('data-product')) showProduct(target.dataset.product);
-    if (target.hasAttribute('data-filter')) filterCollection(target.dataset.filter);
-    if (target.hasAttribute('data-nav-filter')) {
-      $('#product-search').value = '';
-      filterCollection(target.dataset.navFilter);
-      $('.mobile-nav').hidden = true;
-      $('.mobile-menu-trigger').setAttribute('aria-expanded', 'false');
-    }
+    const target = event.target.closest('button,a'); if (!target) return;
     if (target.hasAttribute('data-close')) target.closest('dialog').close();
-    if (target.hasAttribute('data-detail-color')) { selectedColor = target.dataset.detailColor; updateDetailColor(); }
+    if (target.hasAttribute('data-filter')) { activeFilter = target.dataset.filter; renderCollection(); }
+    if (target.hasAttribute('data-detail-color')) { selectedColor = target.dataset.detailColor; updateProductColor(); }
     if (target.hasAttribute('data-size')) {
-      selectedSize = target.dataset.size;
+      selectedSize = target.dataset.size; $('#size-error').hidden = true;
       $$('[data-size]').forEach((button) => { button.classList.toggle('selected', button === target); button.setAttribute('aria-pressed', String(button === target)); });
+    }
+    if (target.hasAttribute('data-gallery-index')) { galleryIndex = Number(target.dataset.galleryIndex); updateGallery(); }
+    if (target.hasAttribute('data-gallery-step')) { galleryIndex = (galleryIndex + Number(target.dataset.galleryStep) + 3) % 3; updateGallery(); }
+    if (target.hasAttribute('data-purchase-step')) {
+      const input = $('#product-quantity'); input.value = Math.max(1, Math.min(99, (Number(input.value) || 1) + Number(target.dataset.purchaseStep)));
     }
     if (target.hasAttribute('data-remove')) { bag.splice(Number(target.dataset.remove), 1); updateBag(); }
     if (target.hasAttribute('data-quantity')) {
-      const index = Number(target.dataset.quantity);
-      bag[index].quantity = Math.min(99, bag[index].quantity + Number(target.dataset.change));
-      if (bag[index].quantity <= 0) bag.splice(index, 1);
-      updateBag();
+      const index = Number(target.dataset.quantity); bag[index].quantity = Math.min(99, bag[index].quantity + Number(target.dataset.change));
+      if (bag[index].quantity <= 0) bag.splice(index, 1); updateBag();
     }
-    if (target.id === 'empty-bag-shop') { $('#bag-dialog').close(); $('#collection').scrollIntoView({ behavior: 'smooth' }); }
+    if (target.hasAttribute('data-info')) showInfo(...information[target.dataset.info]);
+    if (target.id === 'size-guide-trigger') showInfo(...information.size);
+    if (target.id === 'checkout-trigger') showInfo(...information.checkout);
+    if (target.id === 'reset-collection') { activeFilter = 'all'; $('#product-search').value = ''; $('#product-sort').value = 'featured'; renderCollection(); }
+    if (target.id === 'story-trigger') location.href = 'shop.html';
+    if (target.closest('.mobile-nav')) {
+      $('.mobile-nav').hidden = true;
+      $('.mobile-menu-trigger').setAttribute('aria-expanded', 'false');
+      $('.mobile-menu-trigger').setAttribute('aria-label', 'Open menu');
+    }
   });
+  $('.bag-trigger').addEventListener('click', () => { updateBag(); $('#bag-dialog').showModal(); });
+  $('.mobile-menu-trigger').addEventListener('click', () => {
+    const open = $('.mobile-nav').hidden; $('.mobile-nav').hidden = !open;
+    $('.mobile-menu-trigger').setAttribute('aria-expanded', String(open));
+    $('.mobile-menu-trigger').setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+  });
+  $('.search-trigger').addEventListener('click', () => {
+    if (page === 'shop') { $('#product-search').scrollIntoView({ block: 'center', behavior: 'smooth' }); $('#product-search').focus({ preventScroll: true }); }
+    else location.href = 'shop.html?search=1';
+  });
+  $('#close-search')?.addEventListener('click', () => { $('.search-bar').hidden = true; $('#product-search').value = ''; renderCollection(); });
+  $('#newsletter-form')?.addEventListener('submit', (event) => {
+    event.preventDefault(); if (!$('#newsletter-form').reportValidity()) return;
+    const saved = save('aurora-atlas-field-notes-v1', { email: $('#newsletter-email').value.trim(), savedAt: new Date().toISOString() });
+    $('#newsletter-message').textContent = saved ? 'Interest saved in this browser. Field notes will launch with the store.' : 'Field notes are coming soon. Subscriptions open when the store launches.';
+    $('#newsletter-email').value = '';
+  });
+  renderCollection();
+  if (page === 'product') renderProduct();
+  updateBag();
   $$('dialog').forEach((dialog) => dialog.addEventListener('click', (event) => {
     if (event.target !== dialog) return;
     const rect = dialog.getBoundingClientRect();
     if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) dialog.close();
   }));
-  $('.bag-trigger').addEventListener('click', () => { updateBag(); $('#bag-dialog').showModal(); });
-  $('.mobile-menu-trigger').addEventListener('click', () => {
-    $('.mobile-nav').hidden = !$('.mobile-nav').hidden;
-    $('.mobile-menu-trigger').setAttribute('aria-expanded', String(!$('.mobile-nav').hidden));
-    $('.mobile-menu-trigger').setAttribute('aria-label', $('.mobile-nav').hidden ? 'Open menu' : 'Close menu');
-  });
-  $('.mobile-nav a[href="#our-world"]').addEventListener('click', () => { $('.mobile-nav').hidden = true; $('.mobile-menu-trigger').setAttribute('aria-expanded', 'false'); });
-  $('.search-trigger').addEventListener('click', () => {
-    $('.search-bar').hidden = false;
-    $('#collection').scrollIntoView({ behavior: 'smooth' });
-    $('#product-search').focus({ preventScroll: true });
-  });
-  $('#close-search').addEventListener('click', () => { $('.search-bar').hidden = true; $('#product-search').value = ''; renderCollection(); });
-  $('#product-search').addEventListener('input', renderCollection);
-  $('#view-all').addEventListener('click', () => { $('#product-search').value = ''; filterCollection('all'); });
-  $('#product-form').addEventListener('submit', (event) => {
-    event.preventDefault();
-    if (!selectedSize) { toast('Choose your size to add this piece to your bag.'); $('#detail-sizes button').focus(); return; }
-    const item = bag.find((entry) => entry.id === selectedProduct.id && entry.color === selectedColor && entry.size === selectedSize);
-    if (item && item.quantity >= 99) { toast('You have reached the quantity limit for this piece.'); return; }
-    if (item) item.quantity += 1;
-    else bag.push({ id: selectedProduct.id, color: selectedColor, size: selectedSize, quantity: 1 });
+  window.addEventListener('pageshow', () => {
+    const saved = readSaved('aurora-atlas-bag-v1', bag);
+    if (Array.isArray(saved)) bag = saved.filter((item) => item && Object.hasOwn(catalog, item.id) && catalog[item.id].colors.includes(item.color) && catalog[item.id].sizes.includes(item.size) && Number.isInteger(item.quantity) && item.quantity > 0 && item.quantity <= 99);
     updateBag();
-    $('#product-dialog').close();
-    $('#bag-dialog').showModal();
-    toast(`${selectedProduct.name} added. A little more possibility.`);
   });
-  $('#size-guide-trigger').addEventListener('click', () => showInfo('Find your fit.', '<p>All layers use a relaxed, unisex fit. Measurements below are body measurements in centimeters. Choose a larger size for extra room to layer.</p><table><thead><tr><th>Size</th><th>Chest</th><th>Waist</th></tr></thead><tbody><tr><td>XS</td><td>80–87</td><td>64–71</td></tr><tr><td>S</td><td>88–95</td><td>72–79</td></tr><tr><td>M</td><td>96–103</td><td>80–87</td></tr><tr><td>L</td><td>104–111</td><td>88–95</td></tr><tr><td>XL</td><td>112–119</td><td>96–103</td></tr></tbody></table>'));
-  $('#checkout-trigger').addEventListener('click', () => showInfo('Your next step.', '<p>This is a concept storefront. Your bag is saved in this browser, but online checkout and payments are not connected yet.</p><p>You can keep exploring and editing your bag. No order has been placed and no payment has been taken.</p>'));
-  $('#story-trigger').addEventListener('click', () => { filterCollection('all'); $('#collection').scrollIntoView({ behavior: 'smooth' }); });
-  const information = {
-    shipping: ['A little peace of mind.', '<p>Our planned shipping policy includes complimentary standard shipping on orders of $150 or more, and 30-day returns on unworn equipment with original tags.</p><p>Aurora Atlas is currently a concept store. Shipping and order fulfillment will be available when the store launches.</p>'],
-    care: ['Keep your equipment going.', '<p>Puffer & vest: wash cold on a gentle cycle with a mild detergent. Tumble dry low with dryer balls to restore loft. Do not bleach or iron.</p><p>Fleece: wash inside out at 30°C and air dry. Avoid fabric softener.</p><p>Crossbody: spot clean with a damp cloth. Air dry away from direct heat.</p><p>Always follow the care label supplied with your piece.</p>'],
-    contact: ['Good conversations start here.', '<p>Questions about a piece, your fit, or the world of Aurora Atlas?</p><p>This is a concept storefront, so a customer support inbox is not connected yet. For now, our size guide and product care notes can help you get to know the collection.</p>']
-  };
-  $$('[data-info]').forEach((button) => button.addEventListener('click', () => showInfo(...information[button.dataset.info])));
-  $('#newsletter-form').addEventListener('submit', (event) => {
-    event.preventDefault();
-    if (!$('#newsletter-form').reportValidity()) return;
-    const email = $('#newsletter-email').value.trim();
-    const saved = save('aurora-atlas-field-notes-v1', { email, savedAt: new Date().toISOString() });
-    $('#newsletter-message').textContent = saved ? 'Interest saved in this browser. Field notes will launch with the store.' : 'Field notes are coming soon. Subscriptions open when the store launches.';
-    $('#newsletter-email').value = '';
-  });
-  $('#current-year').textContent = '2026';
-  $$('[data-hero-color]').forEach((button) => button.addEventListener('click', () => {
-    heroColor = button.dataset.heroColor;
-    updateHeroModel(heroColor);
-    $('.scene-fallback svg path').setAttribute('fill', colors[heroColor].hex);
-    $('#product-scene').setAttribute('aria-label', `Interactive three-dimensional Boreal puffer jacket in ${colors[heroColor].name}`);
-    $('.hero-feature p').textContent = `${colors[heroColor].name} / Recycled insulation`;
-    $$('[data-hero-color]').forEach((swatch) => { swatch.classList.toggle('selected', swatch === button); swatch.setAttribute('aria-pressed', String(swatch === button)); });
-  }));
-  renderCollection();
-  updateBag();
-
-  // A single WebGL renderer creates the interactive hero and all product images.
-  // Catalog still works with native vector illustrations if WebGL is unavailable.
-  try {
-    if (!window.THREE) throw new Error('Three.js unavailable');
-    initializeEquipmentScene();
-  } catch (error) {
-    console.warn('Using the accessible equipment illustration fallback.', error);
-    $('#product-scene').hidden = true;
-    $('.scene-fallback').hidden = false;
-    $('.visual-bottom>span').innerHTML = '<span class="live-dot"></span> DESIGNED FOR THE EVERYDAY';
-    renderCollection();
-  }
-
-  function initializeEquipmentScene() {
-    const T = window.THREE;
-    const canvas = $('#product-scene');
-    const renderer = new T.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.8));
-    renderer.outputEncoding = T.sRGBEncoding;
-    renderer.toneMapping = T.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = .95;
-    renderer.setClearColor(0x000000, 0);
-    const scene = new T.Scene();
-    scene.add(new T.HemisphereLight(0xf5f5df, 0x273326, .65));
-    const key = new T.DirectionalLight(0xf6f8ea, 1.8); key.position.set(-4, 7, 6); scene.add(key);
-    const fill = new T.DirectionalLight(0xb6cca4, .55); fill.position.set(5, 2, 3); scene.add(fill);
-    const rim = new T.DirectionalLight(0xb9ec80, 1.6); rim.position.set(3, 4, -5); scene.add(rim);
-    const camera = new T.PerspectiveCamera(36, 1, .1, 60);
-    camera.position.set(0, .1, 8.8);
-    camera.lookAt(0, 0, 0);
-    const imageCamera = new T.PerspectiveCamera(35, 1, .1, 50);
-    imageCamera.position.set(0, .2, 8.4);
-    imageCamera.lookAt(0, 0, 0);
-
-    // Fine woven texture adds surface grain without external image dependencies.
-    const textureCanvas = document.createElement('canvas');
-    textureCanvas.width = textureCanvas.height = 128;
-    const ctx = textureCanvas.getContext('2d');
-    const texturePixels = ctx.createImageData(128, 128);
-    let seed = 1743;
-    for (let i = 0; i < texturePixels.data.length; i += 4) {
-      seed = (seed * 1664525 + 1013904223) >>> 0;
-      const value = 125 + (seed % 35);
-      texturePixels.data[i] = texturePixels.data[i + 1] = texturePixels.data[i + 2] = value;
-      texturePixels.data[i + 3] = 255;
-    }
-    ctx.putImageData(texturePixels, 0, 0);
-    const texture = new T.CanvasTexture(textureCanvas);
-    texture.wrapS = texture.wrapT = T.RepeatWrapping;
-    texture.repeat.set(8, 8);
-    const trim = new T.MeshStandardMaterial({ color: '#20271f', roughness: .8 });
-    const metal = new T.MeshStandardMaterial({ color: '#8d9880', metalness: .6, roughness: .35 });
-    const label = new T.MeshStandardMaterial({ color: '#c4f36a', roughness: .8 });
-    const inner = new T.MeshStandardMaterial({ color: '#1b221a', roughness: 1, side: T.DoubleSide });
-    [trim, metal, label, inner].forEach((material) => material.color.convertSRGBToLinear());
-
-    function fabric(color, fleece = false) {
-      const material = new T.MeshStandardMaterial({ color, roughness: fleece ? .98 : .58, metalness: fleece ? 0 : .09, bumpMap: texture, bumpScale: fleece ? .032 : .008, side: T.DoubleSide });
-      material.color.convertSRGBToLinear();
-      return material;
-    }
-    function mesh(geometry, material, parent, x = 0, y = 0, z = 0) {
-      const object = new T.Mesh(geometry, material);
-      object.position.set(x, y, z); parent.add(object); return object;
-    }
-    function box(parent, width, height, depth, material, x, y, z, rotation = 0) {
-      const object = mesh(new T.BoxGeometry(width, height, depth), material, parent, x, y, z);
-      object.rotation.z = rotation; return object;
-    }
-    function rounded(parent, width, height, depth, radius, material, x, y, z) {
-      const shape = new T.Shape(); const w = width / 2, h = height / 2, r = radius;
-      shape.moveTo(-w + r, -h); shape.lineTo(w - r, -h); shape.quadraticCurveTo(w, -h, w, -h + r);
-      shape.lineTo(w, h - r); shape.quadraticCurveTo(w, h, w - r, h); shape.lineTo(-w + r, h); shape.quadraticCurveTo(-w, h, -w, h - r);
-      shape.lineTo(-w, -h + r); shape.quadraticCurveTo(-w, -h, -w + r, -h);
-      const geometry = new T.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelSize: .035, bevelThickness: .035, bevelSegments: 3, steps: 1, curveSegments: 8 });
-      return mesh(geometry, material, parent, x, y, z - depth / 2);
-    }
-    function ring(parent, rx, rz, y, radius = .012, material = trim) {
-      const curve = new T.EllipseCurve(0, 0, rx, rz, 0, Math.PI * 2, false, 0);
-      const points = curve.getPoints(80).map((point) => new T.Vector3(point.x, y, point.y));
-      return mesh(new T.TubeGeometry(new T.CatmullRomCurve3(points, true), 80, radius, 5, true), material, parent);
-    }
-    function tube(parent, material, { bottom, top, rx, rz, puff = .1, segments = 1, taper = 0, cap = true }) {
-      const vertices = [], uvs = [], indices = [];
-      const radial = 72, vertical = Math.max(18, segments * 12);
-      for (let j = 0; j <= vertical; j++) {
-        const t = j / vertical;
-        const wave = Math.pow(Math.max(0, Math.sin((t * segments % 1) * Math.PI)), .65) * puff;
-        const width = rx * (1 + taper * (t - .5)) + wave;
-        const depth = rz + wave * .65;
-        for (let i = 0; i <= radial; i++) {
-          const angle = i / radial * Math.PI * 2;
-          // A soft superellipse gives the front a tailored, flatter surface.
-          const sin = Math.sin(angle), cos = Math.cos(angle);
-          const x = Math.sign(cos) * Math.pow(Math.abs(cos), .83) * width;
-          const z = Math.sign(sin) * Math.pow(Math.abs(sin), .83) * depth;
-          const wrinkle = Math.sin(angle * 17 + t * 29) * Math.sin(t * Math.PI) * .004;
-          vertices.push(x + wrinkle, bottom + (top - bottom) * t, z + wrinkle);
-          uvs.push(i / radial, t);
-          if (j < vertical && i < radial) {
-            const a = j * (radial + 1) + i, b = a + radial + 1;
-            indices.push(a, b, a + 1, b, b + 1, a + 1);
-          }
-        }
-      }
-      const geo = new T.BufferGeometry();
-      geo.setAttribute('position', new T.Float32BufferAttribute(vertices, 3));
-      geo.setAttribute('uv', new T.Float32BufferAttribute(uvs, 2)); geo.setIndex(indices); geo.computeVertexNormals();
-      const object = mesh(geo, material, parent);
-      if (cap) {
-        for (const [y, width] of [[bottom, rx * (1 - taper / 2)], [top, rx * (1 + taper / 2)]]) {
-          const end = mesh(new T.CircleGeometry(1, 64), material, parent, 0, y, 0);
-          end.rotation.x = Math.PI / 2; end.scale.set(width, rz, 1);
-        }
-      }
-      return object;
-    }
-    function brandPatch(parent, x, y, z) {
-      box(parent, .26, .105, .016, label, x, y, z);
-      const shape = new T.Shape(); shape.moveTo(-.04, -.027); shape.lineTo(0, .031); shape.lineTo(.04, -.027); shape.lineTo(.023, -.027); shape.lineTo(0, .007); shape.lineTo(-.023, -.027); shape.closePath();
-      mesh(new T.ShapeGeometry(shape), trim, parent, x, y, z + .012);
-    }
-    function zipper(parent, top, bottom, z) {
-      box(parent, .055, top - bottom, .022, trim, 0, (top + bottom) / 2, z);
-      for (let y = bottom + .02; y < top; y += .05) box(parent, .025, .018, .01, metal, 0, y, z + .016);
-      box(parent, .047, .12, .025, metal, .015, top - .16, z + .035, -.16);
-    }
-    function createJacket(product, color) {
-      const group = new T.Group(), cloth = fabric(colors[color].hex, product.id === 'drift');
-      group.userData.cloth = cloth;
-      const fleece = product.id === 'drift', vest = product.id === 'terrain';
-      const width = vest ? .9 : 1.0, bottom = -1.22, top = .9;
-      tube(group, cloth, { bottom, top, rx: width, rz: .37, puff: fleece ? .025 : .11, segments: fleece ? 1 : 6, taper: .09 });
-      // Sloping shoulder panels close the torso around the neck.
-      const shoulder = mesh(new T.SphereGeometry(1, 48, 24), cloth, group, 0, .87, 0);
-      shoulder.scale.set(width * 1.03, .22, .39);
-      if (!fleece) for (let i = 0; i <= 6; i++) ring(group, width * (1 + .09 * (i / 6 - .5)), .375, bottom + (top - bottom) * i / 6, .009, cloth);
-      ring(group, width * .96, .38, bottom, .045, trim);
-      // Open stand collar, with a dark lining visible from the camera.
-      tube(group, cloth, { bottom: .91, top: 1.35, rx: .46, rz: .31, puff: .055, segments: 1, taper: .1, cap: false });
-      tube(group, inner, { bottom: 1.05, top: 1.34, rx: .412, rz: .266, puff: 0, cap: false });
-      ring(group, .484, .328, 1.35, .022, cloth);
-      const neckBottom = mesh(new T.CircleGeometry(.42, 48), inner, group, 0, 1.06, 0); neckBottom.rotation.x = -Math.PI / 2; neckBottom.scale.y = .65;
-      if (!vest) {
-        for (const side of [-1, 1]) {
-          const sleeve = new T.Group(); group.add(sleeve);
-          sleeve.position.set(side * 1.01, .7, -.015); sleeve.rotation.z = side * .29;
-          tube(sleeve, cloth, { bottom: -1.94, top: .13, rx: .30, rz: .32, puff: fleece ? .018 : .07, segments: fleece ? 1 : 6, taper: .4 });
-          const sleeveCap = mesh(new T.SphereGeometry(1, 32, 20), cloth, sleeve, 0, .08, 0); sleeveCap.scale.set(.36, .25, .36);
-          tube(sleeve, trim, { bottom: -2.04, top: -1.91, rx: .258, rz: .28, puff: .008, cap: true });
-        }
-      } else {
-        // Dark armhole trim emphasizes the vest silhouette.
-        for (const side of [-1, 1]) {
-          const armhole = ring(group, .21, .33, 0, .04, trim);
-          armhole.rotation.z = Math.PI / 2; armhole.position.set(side * .92, .57, 0);
-        }
-      }
-      zipper(group, 1.31, -1.22, .457);
-      for (const side of [-1, 1]) {
-        const pocket = box(group, .025, .49, .025, trim, side * .64, -.64, .455, side * -.18);
-        box(group, .034, .09, .025, metal, side * .66, -.46, .48, side * -.18);
-        pocket.userData.detail = true;
-      }
-      if (fleece) {
-        rounded(group, .38, .45, .035, .035, trim, .58, .35, .405);
-        box(group, .29, .02, .025, metal, .58, .51, .447);
-      }
-      brandPatch(group, .58, fleece ? .32 : .47, fleece ? .452 : .46);
-      group.rotation.set(-.04, -.28, -.10);
-      return group;
-    }
-    function createBag(color) {
-      const group = new T.Group(), cloth = fabric(colors[color].hex);
-      group.userData.cloth = cloth;
-      const strapCurve = new T.CatmullRomCurve3([new T.Vector3(-.94, -.1, -.05), new T.Vector3(-.95, 1, -.1), new T.Vector3(-.15, 1.65, -.15), new T.Vector3(.76, .95, -.1), new T.Vector3(.99, -.1, -.05)]);
-      const strap = mesh(new T.TubeGeometry(strapCurve, 80, .105, 8, false), trim, group); strap.scale.z = .35;
-      rounded(group, 2.3, 1.25, .55, .24, cloth, 0, -.35, 0);
-      rounded(group, 1.9, .70, .09, .14, cloth, 0, -.49, .34);
-      box(group, 1.65, .032, .04, trim, 0, -.25, .42);
-      box(group, .05, .17, .05, metal, .66, -.31, .46, -.1);
-      box(group, 1.9, .035, .04, trim, 0, .28, .2);
-      brandPatch(group, -.58, -.59, .45);
-      for (const side of [-1, 1]) rounded(group, .16, .3, .1, .02, trim, side * 1.17, .03, 0);
-      rounded(group, .29, .24, .12, .035, metal, -.97, .51, -.05);
-      group.scale.setScalar(1.18); group.rotation.set(.02, -.25, -.12); group.position.y = -.15;
-      return group;
-    }
-    const models = new Map();
-    function getModel(product, color) {
-      const key = `${product.id}-${color}`;
-      if (!models.has(key)) models.set(key, product.id === 'transit' ? createBag(color) : createJacket(product, color));
-      return models.get(key);
-    }
-    let hero = getModel(catalog.boreal, 'glacier');
-    scene.add(hero);
-    updateHeroModel = (color) => hero.userData.cloth.color.set(colors[color].hex).convertSRGBToLinear();
-    renderProductImage = (product, color) => {
-      const width = canvas.width, height = canvas.height;
-      const currentVisible = hero.visible;
-      hero.visible = false;
-      const model = getModel(product, color);
-      const wasParent = model.parent;
-      const oldVisible = model.visible;
-      model.visible = true; scene.add(model);
-      renderer.setSize(520, 560, false);
-      imageCamera.aspect = 520 / 560; imageCamera.updateProjectionMatrix();
-      renderer.render(scene, imageCamera);
-      const image = canvas.toDataURL('image/png');
-      scene.remove(model);
-      if (wasParent) wasParent.add(model);
-      model.visible = oldVisible;
-      hero.visible = currentVisible;
-      // Restore CSS-sized hero; renderer's pixel ratio is accounted for here.
-      renderer.setSize(width / renderer.getPixelRatio(), height / renderer.getPixelRatio(), false);
-      return image;
-    };
-    assets.clear();
-    renderCollection(); updateBag();
-    function resize() {
-      const rect = canvas.getBoundingClientRect();
-      renderer.setSize(rect.width, rect.height, false);
-      camera.aspect = rect.width / rect.height;
-      camera.position.z = camera.aspect < .92 ? 10.4 : 8.7;
-      camera.updateProjectionMatrix();
-    }
-    const resizeObserver = new ResizeObserver(resize); resizeObserver.observe(canvas); resize();
-    let dragging = false, lastX = 0, lastY = 0, dragRotation = 0, dragTilt = 0;
-    canvas.addEventListener('pointerdown', (event) => { dragging = true; lastX = event.clientX; lastY = event.clientY; canvas.setPointerCapture(event.pointerId); });
-    canvas.addEventListener('pointermove', (event) => {
-      if (!dragging) return;
-      dragRotation += (event.clientX - lastX) * .009;
-      dragTilt = Math.max(-.3, Math.min(.3, dragTilt + (event.clientY - lastY) * .003));
-      lastX = event.clientX; lastY = event.clientY;
-    });
-    canvas.addEventListener('pointerup', () => { dragging = false; });
-    canvas.addEventListener('pointercancel', () => { dragging = false; });
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    let inView = true;
-    new IntersectionObserver((entries) => { inView = entries[0].isIntersecting; }).observe(canvas);
-    function animate(time) {
-      requestAnimationFrame(animate);
-      if (document.hidden || !inView) return;
-      const motion = reducedMotion.matches ? 0 : 1;
-      hero.rotation.y = -.28 + dragRotation + Math.sin(time * .00033) * .13 * motion;
-      hero.rotation.x = -.04 + dragTilt;
-      hero.rotation.z = -.1 + Math.sin(time * .00045) * .018 * motion;
-      hero.position.y = .05 + Math.sin(time * .0008) * .045 * motion;
-      renderer.render(scene, camera);
-    }
-    requestAnimationFrame(animate);
-  }
+  if (page === 'shop' && params.has('search')) $('#product-search').focus();
 })();
