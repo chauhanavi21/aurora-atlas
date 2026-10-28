@@ -3,74 +3,169 @@
   const api = await window.AuroraAPI.ready;
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
-  const escape = (value) => String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
-  const money = (cents) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
-  const error = (message) => { $('#admin-error').textContent = message; $('#admin-error').hidden = !message; };
-  let overview;
+  const e = (value) => String(value ?? '').replace(/[&<>"']/g,(char)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+  const money = (cents) => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(cents/100);
+  const lines = (value) => value.split(/\r?\n/).map((line)=>line.trim()).filter(Boolean);
+  const date = (value) => new Date(value).toLocaleString();
+  const error = (value) => { $('#admin-error').textContent = value; $('#admin-error').hidden = !value; };
+  const status = (value) => { $('#admin-status').textContent = value; };
+  const empty = (value) => `<p class="admin-empty">${e(value)}</p>`;
+  const pages = Object.fromEntries(['orders','customers','subscribers','audit'].map((key)=>[key,{offset:0,q:'',sequence:0}]));
+  const tabs = {overview:'Overview',products:'Products',inventory:'Inventory & pricing',orders:'Orders',customers:'Customers',subscribers:'Field notes',settings:'Store & homepage',audit:'Activity log',security:'Admin security'};
+  let overview, editing = null, photoDraft = {}, stockDraft = {}, uploading = 0;
   function signedIn(value) { $('#admin-login').hidden = value; $('#admin-dashboard').hidden = !value; }
   if (!api.available) { error('The store server is unavailable. Please refresh and try again.'); $('#admin-login button').disabled = true; return; }
-  async function load() {
-    try {
-      overview = await api.request('/api/admin/overview');
-      signedIn(true);
-      const pending = overview.orders.filter((order) => order.status === 'confirmed').length;
-      $('#admin-metrics').innerHTML = `<div><strong>${overview.counts.orders}</strong><span>Total orders</span></div><div><strong>${pending}</strong><span>To prepare in latest 100</span></div><div><strong>${overview.counts.subscribers}</strong><span>Field notes subscribers</span></div>`;
-      $('#panel-orders').innerHTML = overview.orders.length ? overview.orders.map((order) => {
-        const c = order.customer;
-        return `<article class="commerce-panel admin-order"><div class="admin-order-head"><h2>${escape(order.reference)}</h2><span class="order-badge">${escape(order.status.replaceAll('_',' '))}</span></div><p class="commerce-note">${escape(new Date(order.created).toLocaleString())} · ${money(order.totalCents)} · ${escape(order.paymentStatus.replaceAll('_',' '))}</p><p class="admin-order-customer">${escape([c.name,c.email,c.address1,c.address2,`${c.city}, ${c.state} ${c.postalCode}`].filter(Boolean).join('\n'))}</p><div class="admin-order-lines">${order.items.map((item) => `<p>${item.quantity} × ${escape(item.name)} / ${escape(item.color)} / ${escape(item.size)}</p>`).join('')}</div>${order.status === 'confirmed' ? `<div class="commerce-actions"><button data-order="${order.id}" data-status="fulfilled" data-cod="${order.paymentMethod === 'cod'}">${order.paymentMethod === 'cod' ? 'Mark delivered & payment collected' : 'Mark fulfilled'}</button>${order.paymentMethod === 'cod' ? `<button data-order="${order.id}" data-status="cancelled">Cancel order & restore stock</button>` : ''}</div>` : ''}</article>`;
-      }).join('') : '<div class="commerce-panel"><h2>Your next chapter starts here.</h2><p>Orders will appear here when customers check out.</p></div>';
-      $('#panel-inventory').innerHTML = overview.products.map((product) => `<form class="commerce-panel inventory-form" data-product-id="${product.id}"><h2>${escape(product.name)}</h2><div class="inventory-fields"><label>Price (USD)<input name="price" type="number" step="0.01" min="0.01" max="100000" value="${product.price.toFixed(2)}" required></label><label>Product option<select name="variant">${product.variants.map((variant) => `<option value="${variant.color}|${variant.size}">${escape(window.AuroraCatalog.colors[variant.color].name)} / ${escape(variant.size)}</option>`).join('')}</select></label><label>Available stock<input name="stock" type="number" min="0" max="1000000" step="1" value="${product.variants[0].stock}" required></label></div><button type="submit" class="button button-lime">Save product <span>↗</span></button></form>`).join('');
-      $('#panel-subscribers').innerHTML = `<h2>Your field notes community</h2><p>Latest 100 signups. Subscribers have opted in; email delivery is configured separately.</p><ul>${overview.subscribers.map((subscriber) => `<li>${escape(subscriber.email)} <span class="muted">/ ${escape(new Date(subscriber.created).toLocaleDateString())}</span></li>`).join('')}</ul>`;
-    } catch (failure) { error(failure.message); if (failure.status === 401) signedIn(false); }
+  $('#main').classList.add('admin-page');
+  $('.commerce-heading>p:last-child').textContent = 'Your collection, your customers, your next chapter. All in one place.';
+  $('#admin-dashboard').innerHTML = `<div class="admin-metrics" id="admin-metrics"></div><div class="admin-workspace"><aside class="admin-sidebar"><p class="eyebrow">YOUR STORE</p><div class="admin-tabs" role="tablist" aria-label="Store management" aria-orientation="vertical">${Object.entries(tabs).map(([key,label],i)=>`<button id="tab-${key}" data-admin-tab="${key}" role="tab" aria-controls="panel-${key}" aria-selected="${i===0}" tabindex="${i===0?0:-1}">${String(i+1).padStart(2,'0')} <span>${label}</span> ↗</button>`).join('')}</div><div class="admin-sidebar-actions"><a href="shop.html" target="_blank" rel="noopener">View storefront ↗</a><button id="admin-refresh">Refresh dashboard ↻</button><button id="admin-logout">Sign out ↗</button></div></aside><div class="admin-panels">${Object.keys(tabs).map((key,i)=>`<section id="panel-${key}" role="tabpanel" aria-labelledby="tab-${key}" ${i ? 'hidden' : ''}></section>`).join('')}</div></div>`;
+  const heading = (eyebrow,title,action='')=>`<div class="admin-panel-heading"><div><p class="eyebrow">${eyebrow}</p><h2>${title}</h2></div>${action}</div>`;
+  $('#panel-products').innerHTML = heading('THE COLLECTION','Every piece. Every detail.','<button id="new-product" class="button button-lime">Add product +</button>')+'<div class="admin-filter-bar"><label>Search products<input id="admin-product-search" type="search" placeholder="Name, ID, or category"></label><label>Visibility<select id="admin-product-status"><option value="all">All products</option><option value="published">Published</option><option value="archived">Drafts & archived</option></select></label></div><p id="admin-product-count" class="commerce-note" role="status"></p><div id="admin-product-list" class="admin-product-list"></div>';
+  $('#panel-inventory').innerHTML = heading('READY TO GO','Inventory & pricing')+'<div class="admin-filter-bar"><label>Find a product<input id="inventory-search" type="search" placeholder="Search inventory"></label><label>Stock level<select id="inventory-level"><option value="all">All stock levels</option><option value="low">Low stock (under 5)</option><option value="out">Sold-out options</option></select></label></div><p class="commerce-note">Choose a color and size to edit its available quantity. Edit a product to update all options together.</p><div id="inventory-list" class="admin-inventory"></div>';
+  for (const key of ['orders','customers','subscribers','audit']) {
+    $('#panel-'+key).innerHTML = heading(key === 'orders' ? 'FROM BAG TO DOORSTEP' : 'YOUR GROWING STORE',tabs[key],key === 'subscribers' ? '<button id="export-subscribers" class="text-link">Export CSV ↗</button>' : '') + (key === 'subscribers' ? '<p class="commerce-note">People who opted in to field notes. Email delivery is configured separately.</p>' : '') + (key !== 'audit' ? `<div class="admin-filter-bar"><label>Search ${tabs[key].toLowerCase()}<input data-list-search="${key}" type="search" placeholder="${key === 'orders' ? 'Order reference or customer' : 'Name or email'}"></label>${key === 'orders' ? '<label>Status<select id="admin-order-status"><option value="">All statuses</option><option>confirmed</option><option>shipped</option><option>fulfilled</option><option>cancelled</option><option value="awaiting_payment">Awaiting payment</option><option value="payment_review">Payment review</option></select></label>' : ''}</div>` : '') + `<div id="${key}-list" class="admin-${key}"></div><div data-pager="${key}" class="admin-pager"></div>`;
   }
-  $('#admin-login').addEventListener('submit', async (event) => {
-    event.preventDefault(); if (!event.currentTarget.reportValidity()) return;
-    const button = $('#admin-login button'); button.disabled = true; error('');
-    try {
-      const result = await api.request('/api/admin/login', { method: 'POST', body: Object.fromEntries(new FormData(event.currentTarget)) });
-      api.applyAuth(result); $('#admin-login').reset(); await load();
-    } catch (failure) { error(failure.message); }
-    finally { button.disabled = false; }
+  $('#panel-settings').innerHTML = heading('MAKE IT YOURS','Store & homepage')+'<form id="store-settings-form"></form>';
+  $('#panel-security').innerHTML = '<form id="admin-password-form" class="commerce-panel admin-security"><p class="eyebrow">YOUR KEYS TO THE STORE</p><h2>Change administrator password</h2><label>Current password<input name="currentPassword" type="password" autocomplete="current-password" maxlength="256" required></label><label>New password<input name="newPassword" type="password" autocomplete="new-password" minlength="12" maxlength="256" required></label><label>Confirm new password<input name="confirmPassword" type="password" autocomplete="new-password" minlength="12" maxlength="256" required></label><p class="commerce-note">Use 12–128 characters. Avoid common passwords and your email address. Other administrator sessions are signed out when you change your password.</p><button class="button button-lime" type="submit">Update password ↗</button></form>';
+  const editorInput = (name,label,attributes='')=>`<label>${label}<input name="${name}" ${attributes}></label>`;
+  const editorArea = (name,label,max)=>`<label>${label}<textarea name="${name}" maxlength="${max}" rows="3" required></textarea></label>`;
+  document.body.insertAdjacentHTML('beforeend',`<dialog id="product-editor" class="admin-editor" aria-labelledby="editor-heading"><div class="admin-editor-heading"><div><p class="eyebrow">AURORA ATLAS / THE COLLECTION</p><h2 id="editor-heading">Edit product</h2></div><button type="button" id="close-product-editor" class="icon-button" aria-label="Close product editor">×</button></div><p id="product-editor-error" class="commerce-error" role="alert" hidden></p><form id="product-editor-form"><div class="form-fields">${editorInput('name','Product name','maxlength="120" required')}${editorInput('id','Permanent product ID','pattern="[a-z0-9][a-z0-9-]*[a-z0-9]" minlength="2" maxlength="64" required')}${editorInput('type','Short subtitle','maxlength="150" required')}<label>Category<select name="category">${['outerwear','essentials','bottoms','accessories','footwear'].map((c)=>`<option value="${c}">${c}</option>`).join('')}</select></label>${editorInput('price','Price (USD)','type="number" min="0.01" max="100000" step="0.01" required')}${editorInput('badge','Badge','maxlength="60"')}${editorArea('description','Description',1500)}${editorArea('details','Product details',3000)}${editorArea('fit','Fit & sizing',1200)}${editorArea('care','Care instructions',1200)}${editorArea('features','Features (one per line)',606)}${editorArea('gallery','Gallery labels (three lines)',183)}${editorInput('sizes','Sizes (comma separated)','maxlength="160" placeholder="XS, S, M, L, XL or ONE SIZE" required')}<label id="initial-stock-field">Initial stock per option<input name="initialStock" type="number" min="0" max="1000000" step="1" value="0"></label></div><fieldset class="editor-colors"><legend>Colors</legend><div id="editor-colors"></div></fieldset><div class="admin-panel-heading"><div><h3>Product photography</h3><p class="commerce-note">Upload JPEG, PNG, or WebP photos up to 2 MB. Use up to three photos for each color.</p></div></div><div id="editor-photos"></div><label>Photography credit<input name="photoCredit" maxlength="240" placeholder="Product photography supplied by the store."></label><div id="editor-inventory-wrap"><h3>Stock by option</h3><div id="editor-inventory" class="editor-inventory"></div></div><label class="admin-check"><input name="active" type="checkbox">Published in the storefront</label><div class="admin-editor-footer"><p class="commerce-note">Unpublished products stay in your dashboard. Existing orders keep their original product details.</p><button id="save-product" class="button button-lime" type="submit">Save product ↗</button></div></form></dialog>`);
+  function tab(name) {
+    $$('[data-admin-tab]').forEach((button)=>{const active=button.dataset.adminTab===name;button.setAttribute('aria-selected',String(active));button.tabIndex=active?0:-1;$('#panel-'+button.dataset.adminTab).hidden=!active;});
+  }
+  $('.admin-tabs').addEventListener('keydown',(event)=>{
+    if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;
+    const buttons=$$('[data-admin-tab]'),index=buttons.indexOf(event.target);if(index<0)return;event.preventDefault();
+    const next=event.key==='Home'?0:event.key==='End'?buttons.length-1:(index+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;
+    tab(buttons[next].dataset.adminTab);buttons[next].focus();
   });
-  $('#admin-logout').addEventListener('click', async () => {
-    try { await api.request('/api/admin/logout', { method: 'POST', body: {} }); location.reload(); } catch (failure) { error(failure.message); }
+  function overviewPanel() {
+    const c=overview.counts,s=overview.settings;
+    $('#admin-metrics').innerHTML=[[c.published,'Published products'],[c.openOrders,'Orders to prepare'],[c.customers,'Customer accounts'],[money(c.revenueCents),'Payments collected'],[c.subscribers,'Field notes subscribers']].map(([v,label])=>`<div><strong>${e(v)}</strong><span>${e(label)}</span></div>`).join('');
+    $('#panel-overview').innerHTML=heading('YOUR STORE AT A GLANCE','A little more possibility.')+`<div class="admin-overview-grid"><article class="admin-overview-card"><p class="eyebrow">THE COLLECTION</p><h3>${c.products} pieces. One collection.</h3><p>${c.published} published, ${c.products-c.published} drafts or archived. Tell each product's story, add photographs, and keep every option up to date.</p><button class="text-link" data-go-tab="products">Manage the collection ↗</button></article><article class="admin-overview-card"><p class="eyebrow">THE NEXT CHAPTER</p><h3>${c.openOrders} orders to prepare.</h3><p>Review delivery details, add tracking, mark orders shipped, and confirm delivery and payment collection.</p><button class="text-link" data-go-tab="orders">Open orders ↗</button></article><article class="admin-overview-card"><p class="eyebrow">STORE STATUS</p>${[['Checkout',s.checkoutEnabled?'Open':'Paused'],['Cash on delivery',s.allowCod?'Enabled':'Disabled'],['Stripe',api.settings.stripeEnabled?'Connected':'Keys not configured'],['Low-stock options',c.lowStock]].map(([label,v])=>`<div class="admin-status-line"><span>${label}</span><b>${v}</b></div>`).join('')}<button class="text-link" data-go-tab="settings">Edit store settings ↗</button></article><article class="admin-overview-card"><p class="eyebrow">EVERY DETAIL, CONNECTED</p><h3>Your storefront starts here.</h3><p>Control homepage copy, featured products, delivery charges, tax, policies, and subscriptions. Saved changes appear on the next storefront page load.</p><button class="text-link" data-go-tab="inventory">Review inventory ↗</button></article></div>`;
+  }
+  function renderProducts() {
+    const q=$('#admin-product-search').value.toLowerCase(),visibility=$('#admin-product-status').value;
+    const products=overview.products.filter((p)=>`${p.name} ${p.id} ${p.category}`.toLowerCase().includes(q)&&(visibility==='all'||p.active===(visibility==='published')));
+    $('#admin-product-count').textContent=`${products.length} of ${overview.products.length} products`;
+    $('#admin-product-list').innerHTML=products.length?products.map((p)=>`<article class="admin-product-row"><img src="${e(window.AuroraCatalog.photo(p))}" alt="${e(p.name)}" width="66" height="85" loading="lazy"><div><h3>${e(p.name)}</h3><p>${e(p.id)} / ${e(p.category)}<br>${money(Math.round(p.price*100))} · ${p.variants.reduce((sum,v)=>sum+v.stock,0)} available · <span class="${p.active?'accent':'muted'}">${p.active?'Published':'Draft / archived'}</span></p></div><div class="admin-row-actions"><button data-edit-product="${p.id}">Edit product ↗</button><button data-publish-product="${p.id}">${p.active?'Unpublish':'Publish'}</button>${p.active?`<a class="text-link" href="product.html?id=${p.id}" target="_blank" rel="noopener">View ↗</a>`:''}</div></article>`).join(''):empty('No products match this search.');
+  }
+  function renderInventory() {
+    const q=$('#inventory-search').value.toLowerCase(),level=$('#inventory-level').value;
+    const products=overview.products.filter((p)=>`${p.name} ${p.id}`.toLowerCase().includes(q)&&(level==='all'||p.variants.some((v)=>level==='out'?v.stock===0:v.stock<5)));
+    $('#inventory-list').innerHTML=products.length?products.map((p)=>{
+      const options=p.variants.filter((v)=>level==='all'||(level==='out'?v.stock===0:v.stock<5));
+      return `<form class="commerce-panel inventory-form" data-product-id="${p.id}" data-version="${p.version}"><h2>${e(p.name)}</h2><p class="commerce-note">${p.active?'Published':'Draft / archived'} · ${p.variants.length} options</p><div class="inventory-fields"><label>Price (USD)<input name="price" type="number" min="0.01" max="100000" step="0.01" value="${p.price.toFixed(2)}" required></label><label>Product option<select name="variant">${options.map((v)=>`<option value="${v.color}|${e(v.size)}">${e(overview.colors[v.color].name)} / ${e(v.size)}</option>`).join('')}</select></label><label>Available stock<input name="stock" type="number" min="0" max="1000000" step="1" value="${options[0]?.stock??0}" required></label></div><button class="button button-lime" type="submit">Save price & stock ↗</button><button type="button" class="text-link" data-edit-product="${p.id}">Edit all product details ↗</button></form>`;
+    }).join(''):empty('No inventory options match these filters.');
+  }
+  function settingsForm() {
+    const s=overview.settings;
+    const field=(name,label,multiline=false)=>`<label>${e(label)}${multiline?`<textarea name="${name}" rows="3" required>${e(s[name])}</textarea>`:`<input name="${name}" value="${e(s[name])}" required>`}</label>`;
+    const numeric=(name,label,value,max,step='0.01')=>`<label>${label}<input name="${name}" type="number" min="0" max="${max}" step="${step}" value="${value}" required></label>`;
+    $('#store-settings-form').dataset.version=s.version;
+    $('#store-settings-form').innerHTML=`<section class="settings-group"><h3>Checkout & delivery</h3><div class="form-fields">${numeric('shipping','Standard shipping (USD)',(s.shippingCents/100).toFixed(2),100000)}${numeric('freeShipping','Free shipping from (USD)',(s.freeShippingCents/100).toFixed(2),100000)}${numeric('tax','Merchandise tax (%)',(s.taxRateBps/100).toFixed(2),30)}${numeric('returnDays','Return window (days)',s.returnDays,365,'1')}<label>Customer support email<input name="supportEmail" type="email" maxlength="254" value="${e(s.supportEmail)}"></label></div><div class="settings-checkboxes">${[['checkoutEnabled','Accept new orders'],['allowCod','Offer cash on delivery'],['newsletterEnabled','Accept field notes subscriptions']].map(([name,label])=>`<label class="admin-check"><input name="${name}" type="checkbox" ${s[name]?'checked':''}>${label}</label>`).join('')}</div><p class="commerce-note">Tax applies to merchandise only. Stripe keys and webhook secrets are configured privately on the server.</p></section><section class="settings-group"><h3>Homepage & collection</h3><div class="form-fields">${field('announcement','Announcement')}${field('announcementRight','Announcement sign-off')}${field('heroEyebrow','Hero eyebrow')}${field('heroButton','Hero button label')}${field('heroTitle','Hero headline (line breaks allowed)',true)}${field('heroDescription','Hero description',true)}${field('collectionTitle','Collection heading')}<label>Featured products (choose up to eight)<select name="featuredProductIds" multiple>${overview.products.map((p)=>`<option value="${p.id}" ${s.featuredProductIds.includes(p.id)?'selected':''}>${e(p.name)}${p.active?'':' (unpublished)'}</option>`).join('')}</select><small>Hold Ctrl to select several. Unpublished selections stay hidden.</small></label>${field('storyTitle','Our world heading',true)}${field('storyText','Our world story',true)}${field('newsletterTitle','Newsletter heading')}${field('newsletterDescription','Newsletter description',true)}${field('footerTagline','Footer tagline')}</div></section><section class="settings-group"><h3>Customer information</h3><div class="form-fields">${field('shippingPolicy','Shipping policy',true)}${field('returnPolicy','Returns policy',true)}${field('carePolicy','General care guidance',true)}${field('contactMessage','Contact information',true)}</div></section><div class="settings-submit"><p>Settings are saved locally and used by your storefront and checkout.</p><button class="button button-lime" type="submit">Save store settings ↗</button></div>`;
+  }
+  function orderCard(order) {
+    const c=order.customer;
+    return `<article class="commerce-panel admin-order"><div class="admin-order-head"><h2>${e(order.reference)}</h2><span class="order-badge">${e(order.status.replaceAll('_',' '))}</span></div><p class="commerce-note">${e(date(order.created))} · ${money(order.totalCents)} · ${e(order.paymentStatus.replaceAll('_',' '))}</p><p class="admin-order-customer">${e([c.name,c.email,c.address1,c.address2,`${c.city}, ${c.state} ${c.postalCode}`].filter(Boolean).join('\n'))}</p><div class="admin-order-lines">${order.items.map((item)=>`<p>${item.quantity} × ${e(item.name)} / ${e(item.color)} / ${e(item.size)}</p>`).join('')}</div><form class="order-management-form" data-order-form="${order.id}"><label>Tracking information (shown to customer)<input name="tracking" maxlength="300" value="${e(order.tracking)}" placeholder="Carrier and tracking number"></label><label>Internal notes (admin only)<textarea name="adminNotes" maxlength="3000" rows="2">${e(order.adminNotes)}</textarea></label><button type="submit" class="text-link">Save tracking & notes ↗</button></form><div class="commerce-actions">${order.status==='confirmed'?`<button data-order="${order.id}" data-status="shipped">Mark shipped</button>`:''}${['confirmed','shipped'].includes(order.status)?`<button data-order="${order.id}" data-status="fulfilled" data-cod="${order.paymentMethod==='cod'}">${order.paymentMethod==='cod'?'Mark delivered & payment collected':'Mark fulfilled'}</button>`:''}${order.status==='confirmed'&&order.paymentMethod==='cod'?`<button data-order="${order.id}" data-status="cancelled">Cancel order & restore stock</button>`:''}${order.status==='payment_review'&&order.paymentStatus==='paid'?`<button data-order="${order.id}" data-status="confirmed">Reserve stock & approve payment</button>`:''}</div></article>`;
+  }
+  async function loadList(kind) {
+    const page=pages[kind],sequence=++page.sequence,query=new URLSearchParams({offset:page.offset,limit:20,q:page.q});
+    if(kind==='orders')query.set('status',$('#admin-order-status').value);
+    const container=$('#'+kind+'-list');container.setAttribute('aria-busy','true');
+    try{
+      const data=await api.request('/api/admin/'+kind+'?'+query);if(sequence!==page.sequence)return;
+      if(kind==='orders')container.innerHTML=data.items.length?data.items.map(orderCard).join(''):empty('No orders match these filters.');
+      if(kind==='customers')container.innerHTML=data.items.length?data.items.map((c)=>`<article class="admin-customer"><div class="admin-customer-head"><div><h3>${e(c.email)}</h3><p>Joined ${e(date(c.created))} · ${c.orderCount} orders</p></div><span class="order-badge">${c.disabled?'Disabled':'Active'}</span></div><form class="customer-name-form" data-customer-form="${c.id}"><label>Customer name<input name="name" maxlength="80" value="${e(c.name)}" required></label><button type="submit">Save name</button></form><div class="commerce-actions"><button data-customer="${c.id}" data-disabled="${!c.disabled}">${c.disabled?'Enable account':'Disable account'}</button><button data-customer="${c.id}" data-revoke="true">Sign out all devices</button><button data-customer-orders="${e(c.email)}">Find orders ↗</button></div></article>`).join(''):empty('No customer accounts match this search.');
+      if(kind==='subscribers')container.innerHTML=data.items.length?data.items.map((s)=>`<div class="subscriber-row"><p>${e(s.email)}<small>Subscribed ${e(date(s.created))}</small></p><button data-remove-subscriber="${e(s.email)}">Remove</button></div>`).join(''):empty('No subscribers match this search.');
+      if(kind==='audit')container.innerHTML=data.items.length?data.items.map((entry)=>`<div class="admin-audit-row"><time>${e(date(entry.created))}</time><strong>${e(entry.action.replaceAll('_',' '))}</strong> / ${e(entry.target)}</div>`).join(''):empty('Administrator activity will appear here.');
+      $(`[data-pager="${kind}"]`).innerHTML=`<button data-page-list="${kind}" data-direction="-1" ${page.offset===0?'disabled':''}>← Previous</button><span>${data.total?page.offset+1:0}–${Math.min(page.offset+data.items.length,data.total)} of ${data.total}</span><button data-page-list="${kind}" data-direction="1" ${page.offset+20>=data.total?'disabled':''}>Next →</button>`;
+    }catch(failure){error(failure.message);if(failure.status===401)signedIn(false);}finally{if(sequence===page.sequence)container.removeAttribute('aria-busy');}
+  }
+  async function load(){overview=await api.request('/api/admin/overview');signedIn(true);overviewPanel();renderProducts();renderInventory();settingsForm();await Promise.all(Object.keys(pages).map(loadList));}
+  function editorError(value){$('#product-editor-error').textContent=value;$('#product-editor-error').hidden=!value;}
+  function selectedColors(){return $$('#editor-colors input:checked').map((input)=>input.value);}
+  function rememberDrafts(){ $$('[data-photo-paths]').forEach((input)=>{photoDraft[input.dataset.photoPaths]=lines(input.value);});$$('[data-stock-color]').forEach((input)=>{stockDraft[input.dataset.stockColor+'|'+input.dataset.stockSize]=input.value;}); }
+  function renderOptions(){
+    const form=$('#product-editor-form'),colors=selectedColors(),sizes=form.elements.namedItem('sizes').value.split(',').map((v)=>v.trim()).filter(Boolean);
+    $('#editor-photos').innerHTML=colors.map((color)=>`<section class="editor-photo-row"><img src="${e(photoDraft[color]?.[0]||'favicon.svg')}" alt="${e(overview.colors[color].name)} photo preview"><div><label>${e(overview.colors[color].name)} — local photo paths (one per line)<textarea data-photo-paths="${color}" rows="3" placeholder="Upload a photo below" required>${e((photoDraft[color]||[]).join('\n'))}</textarea></label><label class="photo-upload"><span>Upload photographs</span><input data-upload-color="${color}" type="file" accept="image/jpeg,image/png,image/webp" multiple></label></div></section>`).join('');
+    $('#editor-inventory').innerHTML=colors.flatMap((color)=>sizes.slice(0,12).map((size)=>`<label>${e(overview.colors[color].name)} / ${e(size)}<input data-stock-color="${color}" data-stock-size="${e(size)}" type="number" min="0" max="1000000" step="1" value="${e(stockDraft[color+'|'+size]??0)}" ${editing?'required':''}></label>`)).join('');$('#editor-inventory-wrap').hidden=!editing;
+  }
+  function openEditor(id){
+    editing=id?overview.products.find((p)=>p.id===id):null;photoDraft={};stockDraft={};editorError('');const form=$('#product-editor-form');form.reset();
+    const p=editing||{id:'',name:'',type:'',category:'essentials',price:0,badge:'',description:'',details:'',fit:'',care:'',features:[],gallery:['Full view','Second view','Detail view'],sizes:['XS','S','M','L','XL'],colors:['pictured'],active:false,photoCredit:''};
+    for(const key of ['id','name','type','category','badge','description','details','fit','care','photoCredit'])form.elements.namedItem(key).value=p[key]||'';
+    form.elements.namedItem('price').value=p.price?p.price.toFixed(2):'';form.elements.namedItem('features').value=p.features.join('\n');form.elements.namedItem('gallery').value=p.gallery.join('\n');form.elements.namedItem('sizes').value=p.sizes.join(', ');form.elements.namedItem('active').checked=p.active;
+    form.elements.namedItem('id').readOnly=Boolean(editing);delete form.elements.namedItem('id').dataset.manual;$('#initial-stock-field').hidden=Boolean(editing);$('#editor-heading').textContent=editing?'Edit '+p.name:'Add a new product';
+    $('#editor-colors').innerHTML=Object.entries(overview.colors).map(([color,value])=>`<label><input type="checkbox" value="${color}" ${p.colors.includes(color)?'checked':''}>${e(value.name)}</label>`).join('');
+    if(editing){for(const color of p.colors)photoDraft[color]=p.images?.[color]||[`assets/photos/${p.id}-${color}-front.jpg`];for(const v of p.variants)stockDraft[v.color+'|'+v.size]=v.stock;}
+    renderOptions();$('#product-editor').showModal();form.elements.namedItem('name').focus();
+  }
+  $('#new-product').addEventListener('click',()=>openEditor());$('#close-product-editor').addEventListener('click',()=>$('#product-editor').close());
+  $('#product-editor-form [name=id]').addEventListener('input',(event)=>{event.target.dataset.manual='1';});
+  $('#product-editor-form [name=name]').addEventListener('input',(event)=>{const id=$('#product-editor-form [name=id]');if(!editing&&!id.dataset.manual)id.value=event.target.value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,64);});
+  $('#product-editor-form [name=sizes]').addEventListener('change',()=>{rememberDrafts();renderOptions();});$('#editor-colors').addEventListener('change',()=>{rememberDrafts();renderOptions();});
+  $('#editor-photos').addEventListener('change',async(event)=>{
+    const input=event.target.closest('[data-upload-color]');if(!input)return;const files=[...input.files];if(!files.length)return;
+    if(files.length>3||files.some((file)=>file.size>2*1024*1024||!['image/jpeg','image/png','image/webp'].includes(file.type))){editorError('Choose up to three JPEG, PNG, or WebP photographs, each up to 2 MB.');input.value='';return;}
+    uploading++;$('#save-product').disabled=true;input.disabled=true;editorError('');const paths=[];
+    try{for(const file of files){const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=()=>reject(new Error('Could not read this photo.'));reader.readAsDataURL(file);});paths.push((await api.request('/api/admin/media',{method:'POST',body:{data}})).path);}rememberDrafts();photoDraft[input.dataset.uploadColor]=paths;renderOptions();}
+    catch(failure){editorError(failure.message);}finally{uploading--;$('#save-product').disabled=Boolean(uploading);input.disabled=false;}
   });
-  $('#admin-refresh').addEventListener('click', load);
-  document.addEventListener('click', async (event) => {
-    const tab = event.target.closest('[data-admin-tab]');
-    if (tab) {
-      $$('[data-admin-tab]').forEach((button) => { const active = button === tab; button.setAttribute('aria-selected', String(active)); $('#panel-' + button.dataset.adminTab).hidden = !active; });
-    }
-    const action = event.target.closest('[data-order]');
-    if (!action) return;
-    if (!confirm(action.dataset.status === 'cancelled' ? 'Cancel this order and restore its stock?' : action.dataset.cod === 'true' ? 'Confirm that delivery is complete and payment has been collected?' : 'Mark this paid order as fulfilled?')) return;
-    action.disabled = true; error('');
-    try {
-      await api.request('/api/admin/orders/' + action.dataset.order, { method: 'PATCH', body: { status: action.dataset.status, collected: action.dataset.cod === 'true' } });
-      $('#admin-status').textContent = 'Order updated.'; await load();
-    } catch (failure) { error(failure.message); action.disabled = false; }
+  $('#product-editor-form').addEventListener('submit',async(event)=>{
+    event.preventDefault();const form=event.currentTarget;if(uploading||!form.reportValidity()||form.getAttribute('aria-busy')==='true')return;rememberDrafts();const values=Object.fromEntries(new FormData(form));
+    const product=Object.fromEntries(['name','type','category','badge','description','details','fit','care','photoCredit'].map((key)=>[key,values[key]]));product.features=lines(values.features);product.gallery=lines(values.gallery);product.sizes=values.sizes.split(',').map((s)=>s.trim()).filter(Boolean);product.colors=selectedColors();product.images=Object.fromEntries(product.colors.map((color)=>[color,photoDraft[color]||[]]));
+    const payload={product,priceCents:Math.round(Number(values.price)*100),active:form.elements.namedItem('active').checked};
+    if(editing){payload.version=editing.version;payload.variants=product.colors.flatMap((color)=>product.sizes.map((size)=>({color,size,stock:Number(stockDraft[color+'|'+size]??0)})));}else{payload.id=values.id;payload.initialStock=Number(values.initialStock);}
+    form.setAttribute('aria-busy','true');$('#save-product').disabled=true;editorError('');
+    try{await api.request('/api/admin/products'+(editing?'/'+editing.id:''),{method:editing?'PATCH':'POST',body:payload});$('#product-editor').close();status('Product saved. Your storefront will use the updated details.');await load();}
+    catch(failure){editorError(failure.message);}finally{form.removeAttribute('aria-busy');$('#save-product').disabled=Boolean(uploading);}
   });
-  document.addEventListener('change', (event) => {
-    const form = event.target.closest('.inventory-form');
-    if (!form || event.target.name !== 'variant') return;
-    const [color,size] = event.target.value.split('|');
-    const variant = overview.products.find((product) => product.id === form.dataset.productId).variants.find((variant) => variant.color === color && variant.size === size);
-    form.elements.stock.value = variant.stock;
+  $('#admin-login').addEventListener('submit',async(event)=>{event.preventDefault();if(!event.currentTarget.reportValidity())return;const button=$('#admin-login button');button.disabled=true;error('');try{api.applyAuth(await api.request('/api/admin/login',{method:'POST',body:Object.fromEntries(new FormData(event.currentTarget))}));$('#admin-login').reset();await load();}catch(failure){error(failure.message);}finally{button.disabled=false;}});
+  $('#admin-refresh').addEventListener('click',async()=>{try{error('');await load();status('Dashboard refreshed.');}catch(failure){error(failure.message);}});
+  $('#admin-logout').addEventListener('click',async()=>{try{await api.request('/api/admin/logout',{method:'POST',body:{}});location.reload();}catch(failure){error(failure.message);}});
+  for(const id of ['admin-product-search','admin-product-status'])$('#'+id).addEventListener(id.includes('search')?'input':'change',renderProducts);
+  for(const id of ['inventory-search','inventory-level'])$('#'+id).addEventListener(id.includes('search')?'input':'change',renderInventory);
+  const searchTimers={};$$('[data-list-search]').forEach((input)=>input.addEventListener('input',()=>{const kind=input.dataset.listSearch;clearTimeout(searchTimers[kind]);searchTimers[kind]=setTimeout(()=>{pages[kind].q=input.value;pages[kind].offset=0;loadList(kind);},250);}));
+  $('#admin-order-status').addEventListener('change',()=>{pages.orders.offset=0;loadList('orders');});
+  document.addEventListener('click',async(event)=>{
+    const button=event.target.closest('button');if(!button)return;
+    if(button.dataset.adminTab)tab(button.dataset.adminTab);if(button.dataset.goTab)tab(button.dataset.goTab);if(button.dataset.editProduct)openEditor(button.dataset.editProduct);
+    if(button.dataset.pageList){const kind=button.dataset.pageList;pages[kind].offset=Math.max(0,pages[kind].offset+Number(button.dataset.direction)*20);await loadList(kind);}
+    if(button.dataset.customerOrders){pages.orders.q=button.dataset.customerOrders;pages.orders.offset=0;$('[data-list-search=orders]').value=pages.orders.q;$('#admin-order-status').value='';tab('orders');await loadList('orders');}
+    const publish=button.dataset.publishProduct,order=button.dataset.order,customer=button.dataset.customer,subscriber=button.dataset.removeSubscriber;if(!publish&&!order&&!customer&&!subscriber)return;
+    if(order&&!confirm(button.dataset.status==='cancelled'?'Cancel this order and restore its stock?':button.dataset.cod==='true'?'Confirm delivery is complete and payment has been collected?':'Update this order status?'))return;
+    if(customer&&!confirm(button.dataset.revoke?'Sign this customer out on all devices?':button.dataset.disabled==='true'?'Disable this account and sign out all its devices?':'Enable this customer account?'))return;
+    if(subscriber&&!confirm('Remove this subscriber from field notes?'))return;button.disabled=true;error('');
+    try{
+      if(publish){const p=overview.products.find((p)=>p.id===publish);await api.request('/api/admin/products/'+publish,{method:'PATCH',body:{active:!p.active,version:p.version}});}
+      if(order)await api.request('/api/admin/orders/'+order,{method:'PATCH',body:{status:button.dataset.status,collected:button.dataset.cod==='true'}});
+      if(customer)await api.request('/api/admin/customers/'+customer,{method:'PATCH',body:button.dataset.revoke?{revokeSessions:true}:{disabled:button.dataset.disabled==='true'}});
+      if(subscriber)await api.request('/api/admin/subscribers/'+encodeURIComponent(subscriber),{method:'DELETE',body:{}});
+      status('Your changes have been saved.');await load();
+    }catch(failure){error(failure.message);}finally{button.disabled=false;}
   });
-  document.addEventListener('submit', async (event) => {
-    const form = event.target.closest('.inventory-form');
-    if (!form) return;
-    event.preventDefault(); if (!form.reportValidity()) return;
-    const button = form.querySelector('button'); button.disabled = true; error('');
-    const [color,size] = form.elements.variant.value.split('|');
-    try {
-      const result = await api.request('/api/admin/products/' + form.dataset.productId, { method: 'PATCH', body: { priceCents: Math.round(Number(form.elements.price.value) * 100), color, size, stock: Number(form.elements.stock.value) } });
-      const index = overview.products.findIndex((product) => product.id === result.product.id);
-      overview.products[index] = result.product;
-      $('#admin-status').textContent = `${result.product.name} saved. Customers will see the updated stock and price.`;
-    } catch (failure) { error(failure.message); }
-    finally { button.disabled = false; }
+  document.addEventListener('change',(event)=>{const form=event.target.closest('.inventory-form');if(!form||event.target.name!=='variant')return;const [color,size]=event.target.value.split('|');form.elements.namedItem('stock').value=overview.products.find((p)=>p.id===form.dataset.productId).variants.find((v)=>v.color===color&&v.size===size).stock;});
+  document.addEventListener('submit',async(event)=>{
+    const form=event.target.closest('.inventory-form,.order-management-form,.customer-name-form');if(!form)return;event.preventDefault();if(!form.reportValidity()||form.getAttribute('aria-busy')==='true')return;
+    const button=form.querySelector('button[type=submit]');button.disabled=true;form.setAttribute('aria-busy','true');error('');
+    try{
+      if(form.matches('.inventory-form')){const values=Object.fromEntries(new FormData(form)),[color,size]=values.variant.split('|');const result=await api.request('/api/admin/products/'+form.dataset.productId,{method:'PATCH',body:{priceCents:Math.round(Number(values.price)*100),color,size,stock:Number(values.stock),version:Number(form.dataset.version)}});overview.products[overview.products.findIndex((p)=>p.id===result.product.id)]=result.product;form.dataset.version=result.product.version;renderProducts();}
+      else if(form.matches('.order-management-form'))await api.request('/api/admin/orders/'+form.dataset.orderForm,{method:'PATCH',body:Object.fromEntries(new FormData(form))});
+      else await api.request('/api/admin/customers/'+form.dataset.customerForm,{method:'PATCH',body:Object.fromEntries(new FormData(form))});status('Changes saved. Customers will see the updated information.');await loadList('audit');
+    }catch(failure){error(failure.message);}finally{button.disabled=false;form.removeAttribute('aria-busy');}
   });
-  signedIn(api.admin);
-  if (api.admin) await load();
+  $('#store-settings-form').addEventListener('submit',async(event)=>{
+    event.preventDefault();const form=event.currentTarget;if(!form.reportValidity()||form.getAttribute('aria-busy')==='true')return;const values=Object.fromEntries(new FormData(form)),settings={};
+    for(const key of ['announcement','announcementRight','heroEyebrow','heroTitle','heroDescription','heroButton','collectionTitle','storyTitle','storyText','newsletterTitle','newsletterDescription','footerTagline','shippingPolicy','returnPolicy','carePolicy','contactMessage','supportEmail'])settings[key]=values[key];
+    settings.shippingCents=Math.round(Number(values.shipping)*100);settings.freeShippingCents=Math.round(Number(values.freeShipping)*100);settings.taxRateBps=Math.round(Number(values.tax)*100);settings.returnDays=Number(values.returnDays);for(const key of ['checkoutEnabled','allowCod','newsletterEnabled'])settings[key]=form.elements.namedItem(key).checked;settings.featuredProductIds=[...form.elements.namedItem('featuredProductIds').selectedOptions].map((o)=>o.value);
+    const button=form.querySelector('button[type=submit]');button.disabled=true;form.setAttribute('aria-busy','true');error('');try{const result=await api.request('/api/admin/settings',{method:'PATCH',body:{settings,version:Number(form.dataset.version)}});overview.settings=result.settings;form.dataset.version=result.settings.version;overviewPanel();status('Store settings saved. Open or refresh the storefront to see your changes.');await loadList('audit');}catch(failure){error(failure.message);}finally{button.disabled=false;form.removeAttribute('aria-busy');}
+  });
+  $('#admin-password-form').addEventListener('submit',async(event)=>{event.preventDefault();const form=event.currentTarget;if(!form.reportValidity()||form.getAttribute('aria-busy')==='true')return;const button=form.querySelector('button');button.disabled=true;form.setAttribute('aria-busy','true');error('');try{api.applyAuth(await api.request('/api/admin/password',{method:'POST',body:Object.fromEntries(new FormData(form))}));form.reset();status('Administrator password updated. Other administrator sessions have been signed out.');}catch(failure){error(failure.message);}finally{button.disabled=false;form.removeAttribute('aria-busy');}});
+  $('#export-subscribers').addEventListener('click',async()=>{
+    const button=$('#export-subscribers');button.disabled=true;error('');try{const rows=[];let offset=0,total=1;while(offset<total){const data=await api.request('/api/admin/subscribers?limit=100&offset='+offset);rows.push(...data.items);total=data.total;offset+=data.items.length;if(!data.items.length)break;}
+      const cell=(value)=>'"'+(/^[=+\-@\t\r]/.test(value)?"'":'')+value.replaceAll('"','""')+'"';const csv='Email,Subscribed\r\n'+rows.map((s)=>[s.email,new Date(s.created).toISOString()].map(cell).join(',')).join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download='aurora-field-notes.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status('Subscriber export prepared.');
+    }catch(failure){error(failure.message);}finally{button.disabled=false;}
+  });
+  window.addEventListener('pagehide',()=>{signedIn(false);$('#product-editor').close();});window.addEventListener('aurora:auth',()=>{if(!api.admin)signedIn(false);});
+  signedIn(api.admin);if(api.admin)try{await load();}catch(failure){error(failure.message);}
 })();
