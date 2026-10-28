@@ -71,12 +71,22 @@
     if (sort === 'price-low') visible.sort((a, b) => a.price - b.price);
     if (sort === 'price-high') visible.sort((a, b) => b.price - a.price);
     if (sort === 'name') visible.sort((a, b) => a.name.localeCompare(b.name));
-    const shown = page === 'home' ? visible.slice(0, 4) : visible;
+    const homeEdit = ['boreal', 'cloud', 'horizon', 'transit'];
+    const shown = page === 'home'
+      ? (activeFilter === 'all' && !query ? homeEdit.map((id) => catalog[id]) : visible.slice(0, 4))
+      : visible;
     $('#product-grid').innerHTML = shown.map(card).join('');
     $('#no-results').hidden = visible.length > 0;
     const preview = shown.length < visible.length ? `${shown.length} of ` : '';
     $('.collection-count').textContent = `${preview}${visible.length} considered essential${visible.length === 1 ? '' : 's'}`;
     if ($('#results-title')) $('#results-title').textContent = categories[activeFilter];
+    if ($('#view-all')) {
+      const queryParams = new URLSearchParams();
+      if (activeFilter !== 'all') queryParams.set('category', activeFilter);
+      if (query) queryParams.set('q', query);
+      $('#view-all').href = 'shop.html' + (queryParams.size ? '?' + queryParams : '');
+      $('#view-all').innerHTML = `View all equipment <span>↗</span>`;
+    }
     $$('[data-filter]').forEach((button) => {
       const active = button.dataset.filter === activeFilter;
       button.classList.toggle('selected', active); button.setAttribute('aria-pressed', String(active));
