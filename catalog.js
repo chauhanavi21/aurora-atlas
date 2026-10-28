@@ -248,6 +248,40 @@
         "Upper detail",
         "Fabric detail"
       ]
+    },
+    {
+      "id": "summit",
+      "name": "Summit Zip Hoodie",
+      "type": "The layer that stays by the door",
+      "price": 110,
+      "colors": [
+        "navy",
+        "chalk",
+        "obsidian"
+      ],
+      "description": "Zip up and head out. A classic hooded layer with a drawcord hood and front pockets, ready for the commute, the weekend, and the unexpected detour.",
+      "features": [
+        "Full-length zip",
+        "Drawcord hood",
+        "Front pockets"
+      ],
+      "details": "A zip-front hooded sweatshirt with a drawcord hood, split front pockets, and ribbed cuffs and hem.",
+      "fit": "A regular-to-relaxed fit. Choose your usual size for layering over a tee.",
+      "category": "essentials",
+      "badge": "",
+      "sizes": [
+        "XS",
+        "S",
+        "M",
+        "L",
+        "XL"
+      ],
+      "care": "Follow the original garment care label. Wash with similar colors, reshape gently, and dry away from direct heat.",
+      "gallery": [
+        "Full view",
+        "Upper detail",
+        "Fabric detail"
+      ]
     }
   ];
   const catalog = Object.fromEntries(products.map((product) => [product.id, product]));
