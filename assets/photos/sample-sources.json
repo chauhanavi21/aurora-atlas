@@ -1,0 +1,742 @@
+[
+  {
+    "file": "sample-83-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shirts/blue-&-black-check-shirt/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-83-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shirts/blue-&-black-check-shirt/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-83-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shirts/blue-&-black-check-shirt/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-84-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shirts/gigabyte-aorus-men-tshirt/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-84-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shirts/gigabyte-aorus-men-tshirt/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-84-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shirts/gigabyte-aorus-men-tshirt/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-85-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shirts/man-plaid-shirt/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-85-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shirts/man-plaid-shirt/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-85-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shirts/man-plaid-shirt/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-86-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shirts/man-short-sleeve-shirt/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-86-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shirts/man-short-sleeve-shirt/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-86-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shirts/man-short-sleeve-shirt/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-87-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shirts/men-check-shirt/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-87-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shirts/men-check-shirt/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-87-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shirts/men-check-shirt/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-162-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/tops/blue-frock/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-162-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/tops/blue-frock/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-162-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/tops/blue-frock/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-163-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/tops/girl-summer-dress/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-163-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/tops/girl-summer-dress/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-163-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/tops/girl-summer-dress/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-164-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/tops/gray-dress/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-164-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/tops/gray-dress/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-164-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/tops/gray-dress/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-165-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/tops/short-frock/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-165-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/tops/short-frock/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-165-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/tops/short-frock/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-166-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/tops/tartan-dress/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-166-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/tops/tartan-dress/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-166-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/tops/tartan-dress/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-177-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-dresses/black-women's-gown/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-177-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-dresses/black-women's-gown/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-177-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-dresses/black-women's-gown/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-178-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-dresses/corset-leather-with-skirt/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-178-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-dresses/corset-leather-with-skirt/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-178-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-dresses/corset-leather-with-skirt/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-179-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-dresses/corset-with-black-skirt/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-179-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-dresses/corset-with-black-skirt/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-179-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-dresses/corset-with-black-skirt/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-180-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-dresses/dress-pea/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-180-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-dresses/dress-pea/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-180-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-dresses/dress-pea/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-181-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-dresses/marni-red-&-black-suit/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-181-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-dresses/marni-red-&-black-suit/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-181-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-dresses/marni-red-&-black-suit/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-88-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shoes/nike-air-jordan-1-red-and-black/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-88-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shoes/nike-air-jordan-1-red-and-black/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-88-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shoes/nike-air-jordan-1-red-and-black/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-89-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shoes/nike-baseball-cleats/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-89-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shoes/nike-baseball-cleats/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-89-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shoes/nike-baseball-cleats/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-90-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shoes/puma-future-rider-trainers/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-90-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shoes/puma-future-rider-trainers/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-90-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shoes/puma-future-rider-trainers/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-91-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shoes/sports-sneakers-off-white-&-red/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-91-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shoes/sports-sneakers-off-white-&-red/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-91-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shoes/sports-sneakers-off-white-&-red/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-92-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shoes/sports-sneakers-off-white-red/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-92-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shoes/sports-sneakers-off-white-red/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-92-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-shoes/sports-sneakers-off-white-red/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-185-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-shoes/black-&-brown-slipper/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-185-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-shoes/black-&-brown-slipper/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-185-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-shoes/black-&-brown-slipper/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-186-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-shoes/calvin-klein-heel-shoes/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-186-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-shoes/calvin-klein-heel-shoes/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-186-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-shoes/calvin-klein-heel-shoes/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-187-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-shoes/golden-shoes-woman/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-187-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-shoes/golden-shoes-woman/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-187-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-shoes/golden-shoes-woman/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-188-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-shoes/pampi-shoes/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-188-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-shoes/pampi-shoes/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-188-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-shoes/pampi-shoes/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-189-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-shoes/red-shoes/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-189-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-shoes/red-shoes/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-189-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-shoes/red-shoes/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-172-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-bags/blue-women's-handbag/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-172-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-bags/blue-women's-handbag/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-172-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-bags/blue-women's-handbag/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-173-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-bags/heshe-women's-leather-bag/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-173-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-bags/heshe-women's-leather-bag/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-173-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-bags/heshe-women's-leather-bag/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-174-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-bags/prada-women-bag/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-174-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-bags/prada-women-bag/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-174-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-bags/prada-women-bag/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-175-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-bags/white-faux-leather-backpack/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-175-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-bags/white-faux-leather-backpack/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-175-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-bags/white-faux-leather-backpack/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-176-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-bags/women-handbag-black/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-176-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-bags/women-handbag-black/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-176-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-bags/women-handbag-black/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-154-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/sunglasses/black-sun-glasses/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-154-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/sunglasses/black-sun-glasses/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-154-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/sunglasses/black-sun-glasses/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-155-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/sunglasses/classic-sun-glasses/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-155-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/sunglasses/classic-sun-glasses/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-155-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/sunglasses/classic-sun-glasses/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-156-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/sunglasses/green-and-black-glasses/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-156-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/sunglasses/green-and-black-glasses/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-156-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/sunglasses/green-and-black-glasses/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-157-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/sunglasses/party-glasses/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-157-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/sunglasses/party-glasses/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-157-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/sunglasses/party-glasses/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-158-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/sunglasses/sunglasses/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-158-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/sunglasses/sunglasses/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-158-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/sunglasses/sunglasses/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-93-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-watches/brown-leather-belt-watch/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-93-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-watches/brown-leather-belt-watch/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-93-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-watches/brown-leather-belt-watch/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-94-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-watches/longines-master-collection/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-94-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-watches/longines-master-collection/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-94-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-watches/longines-master-collection/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-95-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-watches/rolex-cellini-date-black-dial/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-95-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-watches/rolex-cellini-date-black-dial/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-95-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-watches/rolex-cellini-date-black-dial/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-96-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-watches/rolex-cellini-moonphase/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-96-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-watches/rolex-cellini-moonphase/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-96-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-watches/rolex-cellini-moonphase/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-97-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-watches/rolex-datejust/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-97-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-watches/rolex-datejust/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-97-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-watches/rolex-datejust/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-98-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-watches/rolex-submariner-watch/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-98-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-watches/rolex-submariner-watch/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-98-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/mens-watches/rolex-submariner-watch/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-190-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-watches/iwc-ingenieur-automatic-steel/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-190-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-watches/iwc-ingenieur-automatic-steel/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-190-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-watches/iwc-ingenieur-automatic-steel/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-191-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-watches/rolex-cellini-moonphase/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-191-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-watches/rolex-cellini-moonphase/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-191-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-watches/rolex-cellini-moonphase/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-192-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-watches/rolex-datejust-women/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-192-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-watches/rolex-datejust-women/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-192-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-watches/rolex-datejust-women/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-193-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-watches/watch-gold-for-women/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-193-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-watches/watch-gold-for-women/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-193-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-watches/watch-gold-for-women/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-194-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-watches/women's-wrist-watch/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-194-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-watches/women's-wrist-watch/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-194-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-watches/women's-wrist-watch/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-182-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-jewellery/green-crystal-earring/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-182-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-jewellery/green-crystal-earring/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-182-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-jewellery/green-crystal-earring/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-183-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-jewellery/green-oval-earring/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-183-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-jewellery/green-oval-earring/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-183-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-jewellery/green-oval-earring/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-184-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-jewellery/tropical-earring/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-184-pictured-2.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-jewellery/tropical-earring/2.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-184-pictured-3.webp",
+    "url": "https://cdn.dummyjson.com/product-images/womens-jewellery/tropical-earring/3.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  },
+  {
+    "file": "sample-137-pictured-1.webp",
+    "url": "https://cdn.dummyjson.com/product-images/sports-accessories/american-football/1.webp",
+    "credit": "DummyJSON sample product photography. Demonstration catalog; not Aurora Atlas inventory."
+  }
+]
