@@ -59,6 +59,19 @@ try {
   assert.equal($('script[src="scene.js"]') !== null, true);
   assert.equal($('#product-dialog'), null, 'Product links should open pages, not a modal');
   const { products, colors } = window.AuroraCatalog;
+  const totalPhotos = products.reduce((sum, product) => sum + product.colors.length, 0);
+  assert.equal(new Set(products.map((product) => product.id)).size, products.length, 'Product IDs must be unique');
+  assert.equal($('[data-category-count="all"]').textContent, String(products.length).padStart(2, '0'));
+  assert.match($('.collection-count').textContent, new RegExp(`4 of ${products.length}`));
+  assert($('#product-grid [data-product="cloud"]'), 'The homepage should introduce a new layer');
+  assert($('#product-grid [data-product="horizon"]'), 'The homepage should introduce trousers');
+  click('[data-filter="bottoms"]');
+  assert.equal($$('#product-grid .product-card').length, products.filter((product) => product.category === 'bottoms').length);
+  assert.equal($('#view-all').getAttribute('href'), 'shop.html?category=bottoms');
+  click('[data-filter="all"]');
+  const sources = JSON.parse(await readFile('assets/photos/sources.json', 'utf8'));
+  assert.equal(sources.length, totalPhotos);
+  assert.equal(new Set(sources.map((source) => source.file)).size, totalPhotos);
   for (const file of ['style.css', 'pages.css']) {
     const stylesheet = new window.CSSStyleSheet();
     stylesheet.replaceSync(await readFile(file, 'utf8'));
@@ -66,21 +79,24 @@ try {
   }
   for (const product of products) {
     for (const color of product.colors) {
-      const bytes = await readFile('assets/photos/' + product.id + '-' + color + '-front.jpg');
+      assert(colors[color], 'Every product color must have a label and swatch');
+      const filename = product.id + '-' + color + '-front.jpg';
+      assert(sources.some((source) => source.file === filename && source.url.startsWith('https://') && source.credit));
+      const bytes = await readFile('assets/photos/' + filename);
       const size = jpegSize(bytes);
       assert(size.width >= 1200 && size.height >= 1600, 'Product photo is too small');
     }
   }
-  console.log('Homepage links and all 11 full-resolution product photographs passed.');
+  console.log(`Homepage links, catalog integrity, source credits, and all ${totalPhotos} full-resolution photographs passed.`);
 
   await load('shop.html?category=outerwear');
-  assert.equal($$('#product-grid .product-card').length, 2);
+  assert.equal($$('#product-grid .product-card').length, products.filter((product) => product.category === 'outerwear').length);
   assert.equal($('#results-title').textContent, 'Outerwear');
   click('[data-filter="all"]');
   input('#product-sort', 'price-low', 'change');
-  assert.equal($('#product-grid h3').textContent, 'Transit Crossbody');
+  assert.equal($('#product-grid h3').textContent, [...products].sort((a, b) => a.price - b.price)[0].name);
   input('#product-sort', 'price-high', 'change');
-  assert.equal($('#product-grid h3').textContent, 'Boreal Puffer');
+  assert.equal($('#product-grid h3').textContent, [...products].sort((a, b) => b.price - a.price)[0].name);
   input('#product-search', 'fleece');
   assert.equal($$('#product-grid .product-card').length, 1);
   assert.equal(new URLSearchParams(window.location.search).get('q'), 'fleece');
@@ -88,7 +104,17 @@ try {
   assert.equal($('#no-results').hidden, false);
   assert.equal($('#product-grid script'), null);
   click('#reset-collection');
-  assert.equal($$('#product-grid .product-card').length, 4);
+  assert.equal($$('#product-grid .product-card').length, products.length);
+  for (const category of new Set(products.map((product) => product.category))) {
+    click(`[data-filter="${category}"]`);
+    const expected = products.filter((product) => product.category === category).length;
+    assert.equal($$('#product-grid .product-card').length, expected);
+    assert.equal($(`[data-category-count="${category}"]`).textContent, String(expected).padStart(2, '0'));
+    assert.equal(new URLSearchParams(window.location.search).get('category'), category);
+  }
+  click('[data-filter="all"]');
+  input('#product-sort', 'name', 'change');
+  assert.deepEqual($$('#product-grid h3').map((element) => element.textContent), Array.from(products, (product) => product.name).sort((a, b) => a.localeCompare(b)));
   click('.mobile-menu-trigger');
   assert.equal($('.mobile-nav').hidden, false);
   click('.mobile-menu-trigger');
@@ -152,14 +178,34 @@ try {
       assert.equal($('#detail-title').textContent, product.name);
       assert.equal($('#detail-color-name').textContent, colors[color].name);
       assert.equal($$('[data-gallery-index]').length, 3);
+      assert.equal($$('.related-products .product-card').length, 3);
+      assert.equal($(`.related-products [data-product="${product.id}"]`), null);
+      assert.equal($('.size-note').textContent, product.fit);
       assert.match($('#detail-image').src, new RegExp(product.id + '-' + color + '-front.jpg'));
     }
-  }
+    const previousCount = Number($('.bag-count').textContent);
+    const previousTotal = Number($('#bag-subtotal').textContent.replace(/[^0-9]/g, ''));
+    if (product.sizes.length > 1) click('[data-size="M"]');
+    submit();
+    assert.equal($('#bag-dialog').open, true);
+    assert.equal(Number($('.bag-count').textContent), previousCount + 1);
+    assert.equal(Number($('#bag-subtotal').textContent.replace(/[^0-9]/g, '')), previousTotal + product.price);
+    assert($(`#bag-items a[href*="id=${product.id}"]`));
+    assert($('.product-purchase > .eyebrow').textContent.endsWith(String(products.indexOf(product) + 1).padStart(3, '0')));  }
+  await load('shop.html?category=bottoms&q=trousers&sort=price-low');
+  assert.equal($('#product-search').value, 'trousers');
+  assert.equal($('#product-sort').value, 'price-low');
+  assert.equal($('#results-title').textContent, 'Bottoms');
+  assert.equal($$('#product-grid .product-card').length, 2);
+  assert.equal($('#product-grid h3').textContent, 'Traverse Easy Trousers');
+  await load('product.html?id=polar&color=missing');
+  assert.equal($('#detail-color-name').textContent, colors[products.find((product) => product.id === 'polar').colors[0]].name);
+  console.log(`All ${products.length} products passed size selection, recommendations, and bag additions.`);
   await load('product.html?id=not-a-product');
   assert($('.product-not-found'));
   assert.equal($('.product-not-found a').getAttribute('href'), 'shop.html');
   await load('shop.html?category=not-a-category');
-  assert.equal($$('#product-grid .product-card').length, 4);
+  assert.equal($$('#product-grid .product-card').length, products.length);
   state.set('aurora-atlas-bag-v1', '[null,{"id":"__proto__"},{"id":"missing"}]');
   await window.happyDOM.abort(); window = null;
   await load('index.html');

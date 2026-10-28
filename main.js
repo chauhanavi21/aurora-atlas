@@ -32,12 +32,12 @@
     if (!$('#toast')) document.body.insertAdjacentHTML('beforeend', '<div id="toast" class="toast" role="status" aria-live="polite"></div>');
   }
   mountSharedLayout();
-  $('[data-category-count]').forEach((element) => {
+  $$('[data-category-count]').forEach((element) => {
     const category = element.dataset.categoryCount;
     const count = category === 'all' ? products.length : products.filter((product) => product.category === category).length;
     element.textContent = String(count).padStart(2, '0');
   });
-  $('[data-catalog-total]').forEach((element) => { element.textContent = String(products.length); });
+  $$('[data-catalog-total]').forEach((element) => { element.textContent = String(products.length); });
 
   function toast(message) {
     clearTimeout(toastTimer);
@@ -85,7 +85,6 @@
       if (activeFilter !== 'all') queryParams.set('category', activeFilter);
       if (query) queryParams.set('q', query);
       $('#view-all').href = 'shop.html' + (queryParams.size ? '?' + queryParams : '');
-      $('#view-all').innerHTML = `View all equipment <span>↗</span>`;
     }
     $$('[data-filter]').forEach((button) => {
       const active = button.dataset.filter === activeFilter;
