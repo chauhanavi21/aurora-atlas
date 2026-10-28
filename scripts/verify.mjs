@@ -22,7 +22,7 @@ try {
     try { target = (await (await fetch('http://127.0.0.1:9224/json')).json()).find((page) => page.type === 'page'); if (target) break; } catch {}
     await delay(150);
   }
-  assert(target, 'Chrome remote debugging did not start');
+  assert(target, 'Chrome remote debugging did not start. ' + browserLog.slice(-1800));
   socket = new WebSocket(target.webSocketDebuggerUrl);
   await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject; });
   let nextId = 0;
@@ -133,7 +133,7 @@ try {
   console.log('Product links, shareable color URLs, photo gallery, zoom, size validation, quantities, and saved bag passed.');
 
   await click('.desktop-nav [data-nav-filter="all"]');
-  await waitFor('document.body.dataset.page === "shop" && document.querySelectorAll("#product-grid .product-card").length === 4');
+  await waitFor('document.body.dataset.page === "shop" && document.querySelectorAll("#product-grid .product-card").length === window.AuroraCatalog.products.length');
   assert.equal(await evaluate('document.querySelector(".bag-count").textContent'), '1');
   await loadPhotos();
   await evaluate('document.fonts.ready');
@@ -146,7 +146,7 @@ try {
   assert.equal(await evaluate('new URLSearchParams(location.search).get("category")'), 'outerwear');
   await click('[data-filter="all"]');
   await evaluate('document.querySelector("#product-sort").value="price-low"; document.querySelector("#product-sort").dispatchEvent(new Event("change"))');
-  assert.equal(await evaluate('document.querySelector("#product-grid h3").textContent'), 'Transit Crossbody');
+  assert.equal(await evaluate('document.querySelector("#product-grid h3").textContent'), await evaluate('[...window.AuroraCatalog.products].sort((a,b) => a.price-b.price)[0].name'));
   await evaluate('document.querySelector("#product-sort").value="price-high"; document.querySelector("#product-sort").dispatchEvent(new Event("change"))');
   assert.equal(await evaluate('document.querySelector("#product-grid h3").textContent'), 'Boreal Puffer');
   await evaluate('document.querySelector("#product-search").value="fleece"; document.querySelector("#product-search").dispatchEvent(new Event("input"))');
@@ -157,7 +157,7 @@ try {
   await evaluate('document.querySelector("#product-search").value="no-such-piece"; document.querySelector("#product-search").dispatchEvent(new Event("input"))');
   assert.equal(await evaluate('document.querySelector("#no-results").hidden'), false);
   await click('#reset-collection');
-  assert.equal(await evaluate('document.querySelectorAll("#product-grid .product-card").length'), 4);
+  assert.equal(await evaluate('document.querySelectorAll("#product-grid .product-card").length'), await evaluate('window.AuroraCatalog.products.length'));
   await click('[data-filter="accessories"]');
   await click('#product-grid [data-product="transit"]');
   await waitFor('document.querySelector("#detail-title")?.textContent === "Transit Crossbody"');
@@ -169,7 +169,8 @@ try {
   await click('#bag-dialog [data-close]');
   console.log('Shop page, navigation, search, sorting, filter URLs, reloads, one-size products, and cross-page bag passed.');
 
-  for (const id of ['boreal', 'drift', 'terrain', 'transit']) {
+  const productIds = await evaluate('window.AuroraCatalog.products.map(product => product.id)');
+  for (const id of productIds) {
     await navigate('product.html?id=' + id, '!!document.querySelector("#detail-title")');
     await loadPhotos();
     assert.equal(await evaluate('document.querySelector("#detail-image").naturalWidth > 0'), true, id + ' photo failed');
@@ -180,10 +181,10 @@ try {
       assert.equal(await evaluate('document.querySelector("#detail-image").src.includes("-' + color + '-front.jpg")'), true);
     }
   }
-  console.log('All 11 real colorway photos loaded successfully.');
+  console.log('All catalog colorway photos loaded successfully.');
 
   await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-  await navigate('shop.html', 'document.body.dataset.page === "shop" && document.querySelectorAll("#product-grid .product-card").length === 4');
+  await navigate('shop.html', 'document.body.dataset.page === "shop" && document.querySelectorAll("#product-grid .product-card").length === window.AuroraCatalog.products.length');
   await loadPhotos();
   await evaluate('window.scrollTo({top:0,behavior:"instant"})');
   await checkOverflow('Shop mobile');
@@ -210,6 +211,13 @@ try {
   assert.match(await evaluate('document.querySelector("#newsletter-message").textContent'), /saved in this browser/);
   console.log('Mobile shop, real navigation, product photos, variant selection, bag, and newsletter passed.');
 
+  for (const width of [768, 900]) {
+    await command('Emulation.setDeviceMetricsOverride', { width, height: 1024, deviceScaleFactor: 1, mobile: false });
+    for (const path of ['index.html', 'shop.html', 'product.html?id=horizon']) {
+      await navigate(path, '!!window.AuroraCatalog && !!document.querySelector(".bag-trigger")');
+      await checkOverflow(`${path} at ${width}px`);
+    }
+  }
   await command('Emulation.setDeviceMetricsOverride', { width: 320, height: 740, deviceScaleFactor: 1, mobile: true });
   for (const path of ['shop.html', 'product.html?id=boreal', 'index.html']) {
     await navigate(path, 'document.readyState === "complete" && !!document.querySelector(".bag-count")');
@@ -217,7 +225,7 @@ try {
   }
   await navigate('product.html?id=not-a-product', '!!document.querySelector(".product-not-found")');
   assert.equal(await evaluate('document.querySelector(".product-not-found a").getAttribute("href")'), 'shop.html');
-  await navigate('shop.html?category=invalid', 'document.querySelectorAll("#product-grid .product-card").length === 4');
+  await navigate('shop.html?category=invalid', 'document.querySelectorAll("#product-grid .product-card").length === window.AuroraCatalog.products.length');
   await command('Page.addScriptToEvaluateOnNewDocument', { source: 'const originalContext = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function(type, ...args) { return type.includes("webgl") ? null : originalContext.call(this, type, ...args); };' });
   await navigate('index.html', 'document.querySelector("#product-scene")?.hidden && document.querySelectorAll("#product-grid .product-card").length === 4');
   await loadPhotos();
