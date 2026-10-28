@@ -3,6 +3,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 
 const samples = [
+  ['meadow-obsidian-front', '455754', '09', 'item'],
   ['dune-navy-front', '455957', '69', 'item'],
   ['dune-obsidian-front', '455957', '09', 'item'],
   ['field-obsidian-front', '460774', '09', 'item'],

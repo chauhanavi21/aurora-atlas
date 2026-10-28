@@ -447,6 +447,38 @@
         "Upper detail",
         "Fabric detail"
       ]
+    },
+    {
+      "id": "meadow",
+      "name": "Meadow Button Dress",
+      "type": "One piece. Plenty of possibility.",
+      "price": 95,
+      "colors": [
+        "obsidian"
+      ],
+      "badge": "THE ONE-PIECE EDIT",
+      "description": "An easy answer to an open day. A short button-front dress with a V neckline, loose sleeves, and a gathered shape that keeps things simple.",
+      "features": [
+        "Button front",
+        "V neckline",
+        "Gathered skirt"
+      ],
+      "details": "A short-sleeved dress with a V-shaped neckline, front buttons, a gathered waist, and a tiered skirt. The silhouette is loose and above the knee in the reference photo.",
+      "fit": "A loose dress silhouette with a gathered waist. Use the chest and waist guide; choose your usual size for an easy fit.",
+      "category": "essentials",
+      "sizes": [
+        "XS",
+        "S",
+        "M",
+        "L",
+        "XL"
+      ],
+      "care": "Follow the original garment care label. Wash with similar colors, reshape gently, and dry away from direct heat.",
+      "gallery": [
+        "Full view",
+        "Upper detail",
+        "Fabric detail"
+      ]
     }
   ];
   const catalog = Object.fromEntries(products.map((product) => [product.id, product]));
