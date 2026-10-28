@@ -1,13 +1,15 @@
 /* Shared storefront behavior. Real photos are used everywhere customers shop. */
-(() => {
+(async () => {
   'use strict';
+  await window.AuroraAPI?.ready;
+  const api = window.AuroraAPI;
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
   const { products, catalog, colors, photo, productUrl } = window.AuroraCatalog;
   const page = document.body.dataset.page || 'home';
   const params = new URLSearchParams(location.search);
   const categories = { all: 'All equipment', outerwear: 'Outerwear', essentials: 'Essentials', bottoms: 'Bottoms', accessories: 'Accessories' };
-  const money = (amount) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
+  const money = (amount) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amount);
   let activeFilter = Object.hasOwn(categories, params.get('category')) ? params.get('category') : 'all';
   let selectedProduct = null, selectedColor = null, selectedSize = null, galleryIndex = 0, toastTimer;
 
@@ -18,6 +20,8 @@
     try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch { return false; }
   }
   let bag = readSaved('aurora-atlas-bag-v1', []);
+  if (api) bag = api.cart.items;
+  let bagBusy = false;
   bag = Array.isArray(bag) ? bag.filter((item) => item && Object.hasOwn(catalog, item.id) && catalog[item.id].colors.includes(item.color) && catalog[item.id].sizes.includes(item.size) && Number.isInteger(item.quantity) && item.quantity > 0 && item.quantity <= 99) : [];
 
   function mountSharedLayout() {
@@ -129,7 +133,7 @@
     $('#product-content').innerHTML = `
       <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="index.html">Home</a><span aria-hidden="true">/</span><a href="shop.html">All equipment</a><span aria-hidden="true">/</span><a href="shop.html?category=${p.category}">${categories[p.category]}</a><span aria-hidden="true">/</span><span>${p.name}</span></nav>
       <section class="product-layout" aria-labelledby="detail-title"><div class="product-gallery"><div class="gallery-photo"><span class="gallery-badge">${p.badge || 'THE EVERYDAY EDIT'}</span><button id="gallery-zoom" aria-label="Enlarge product photo"><img id="detail-image" src="${photo(p, selectedColor)}" alt="${p.name} in ${colors[selectedColor].name}, full view" width="1200" height="1600" fetchpriority="high"></button><span class="gallery-photo-index" id="gallery-count">01 / 03</span><span class="zoom-hint" aria-hidden="true">+ CLICK TO GET CLOSER</span></div><div class="gallery-controls"><div id="gallery-thumbnails" class="gallery-thumbnails" role="group" aria-label="Product photo gallery">${p.gallery.map((label, index) => `<button data-gallery-index="${index}" class="${index === 0 ? 'selected' : ''}" aria-label="${label}" aria-pressed="${index === 0}"><img src="${photo(p, selectedColor)}" alt="" data-view="${index}" width="90" height="120"><span>${label}</span></button>`).join('')}</div><div class="gallery-arrows"><button class="icon-button" data-gallery-step="-1" aria-label="Previous product photo">←</button><button class="icon-button" data-gallery-step="1" aria-label="Next product photo">→</button></div></div><p class="photo-reference">Concept collection · Reference product photography. Detail views are close-up crops.</p></div>
-      <div class="product-purchase"><p class="eyebrow">AA / ${p.category.toUpperCase()} / ${String(products.indexOf(p) + 1).padStart(3, '0')}</p><h1 id="detail-title">${p.name}</h1><p class="product-subtitle">${p.type}</p><p id="detail-price" class="product-page-price">${money(p.price)} <span>USD</span></p><p class="product-page-description">${p.description}</p><div class="feature-tags">${p.features.map((feature) => `<span>${feature}</span>`).join('')}</div><form id="product-form"><fieldset><legend>Color — <span id="detail-color-name">${colors[selectedColor].name}</span></legend><div id="detail-colors" class="detail-colors"></div></fieldset><fieldset id="size-fieldset" ${p.sizes.length === 1 ? 'hidden' : ''}><legend><span>Choose your size</span><button type="button" id="size-guide-trigger">Size guide ↗</button></legend><div id="detail-sizes" class="size-options">${p.sizes.map((size) => `<button type="button" data-size="${size}" aria-pressed="false">${size}</button>`).join('')}</div><p class="size-note">${p.fit}</p><p id="size-error" class="form-error" role="alert" hidden>Choose a size before adding this piece to your bag.</p></fieldset><div class="purchase-row"><div class="purchase-quantity"><button type="button" data-purchase-step="-1" aria-label="Decrease quantity">−</button><label class="sr-only" for="product-quantity">Quantity</label><input id="product-quantity" type="number" min="1" max="99" step="1" value="1" required><button type="button" data-purchase-step="1" aria-label="Increase quantity">+</button></div><button type="submit" class="button button-lime add-to-bag">Add to bag <span>↗</span></button></div></form><div class="product-delivery"><span>↗ <span>Complimentary shipping<br><small>On orders $150 and over</small></span></span><span>↺ <span>Take your time<br><small>30 days to find your fit</small></span></span></div><div class="product-accordions"><details open><summary>The details <span>+</span></summary><p>${p.details}</p></details><details><summary>Fit & sizing <span>+</span></summary><p>${p.fit}</p></details><details><summary>Care for your equipment <span>+</span></summary><p>${p.care}</p></details><details><summary>Shipping & returns <span>+</span></summary><p>Our planned policy includes complimentary shipping on orders $150+ and returns within 30 days. This concept collection is not currently available for fulfillment.</p></details></div></div></section>
+      <div class="product-purchase"><p class="eyebrow">AA / ${p.category.toUpperCase()} / ${String(products.indexOf(p) + 1).padStart(3, '0')}</p><h1 id="detail-title">${p.name}</h1><p class="product-subtitle">${p.type}</p><p id="detail-price" class="product-page-price">${money(p.price)} <span>USD</span></p><p class="product-page-description">${p.description}</p><div class="feature-tags">${p.features.map((feature) => `<span>${feature}</span>`).join('')}</div><form id="product-form"><fieldset><legend>Color — <span id="detail-color-name">${colors[selectedColor].name}</span></legend><div id="detail-colors" class="detail-colors"></div></fieldset><fieldset id="size-fieldset" ${p.sizes.length === 1 ? 'hidden' : ''}><legend><span>Choose your size</span><button type="button" id="size-guide-trigger">Size guide ↗</button></legend><div id="detail-sizes" class="size-options">${p.sizes.map((size) => `<button type="button" data-size="${size}" aria-pressed="false">${size}</button>`).join('')}</div><p class="size-note">${p.fit}</p><p id="size-error" class="form-error" role="alert" hidden>Choose a size before adding this piece to your bag.</p></fieldset><p id="stock-message" class="stock-note" role="status"></p><div class="purchase-row"><div class="purchase-quantity"><button type="button" data-purchase-step="-1" aria-label="Decrease quantity">−</button><label class="sr-only" for="product-quantity">Quantity</label><input id="product-quantity" type="number" min="1" max="99" step="1" value="1" required><button type="button" data-purchase-step="1" aria-label="Increase quantity">+</button></div><button type="submit" class="button button-lime add-to-bag">Add to bag <span>↗</span></button></div></form><div class="product-delivery"><span>↗ <span>Complimentary shipping<br><small>On orders $150 and over</small></span></span><span>↺ <span>Take your time<br><small>30 days to find your fit</small></span></span></div><div class="product-accordions"><details open><summary>The details <span>+</span></summary><p>${p.details}</p></details><details><summary>Fit & sizing <span>+</span></summary><p>${p.fit}</p></details><details><summary>Care for your equipment <span>+</span></summary><p>${p.care}</p></details><details><summary>Shipping & returns <span>+</span></summary><p>Standard delivery is available within the United States. Review the shipping charge and delivery address at checkout. Keep your order reference for help with your delivery or a return.</p></details></div></div></section>
       <section class="product-detail-story"><div><p class="eyebrow">PURPOSE IN EVERY PIECE</p><h2>All the detail.<br>None of the excess.</h2></div><div>${p.features.map((feature, index) => `<div><span>0${index + 1}</span><h3>${feature}</h3></div>`).join('')}</div></section><section class="related-products" aria-labelledby="related-heading"><div class="section-heading"><div><p class="eyebrow">GOOD COMPANY FOR YOUR NEXT CHAPTER</p><h2 id="related-heading">Better together.</h2></div><a href="shop.html" class="text-link">Explore all equipment <span>↗</span></a></div><div class="product-grid">${relatedProducts(p).map(card).join('')}</div></section>`;
     updateProductColor(false);
     $('#product-form').addEventListener('submit', addToBag);
@@ -137,6 +141,12 @@
     $('.product-gallery').addEventListener('keydown', galleryKeys);
     $('#image-dialog').addEventListener('keydown', galleryKeys);
     $$('.desktop-nav [data-nav-filter]').forEach((link) => { if (link.dataset.navFilter === p.category) { link.classList.add('active'); link.setAttribute('aria-current', 'page'); } });
+  }
+  function updateAvailability() {
+    if (!selectedProduct?.variants) return;
+    const variant = selectedProduct.variants.find((item) => item.color === selectedColor && item.size === selectedSize);
+    $('#stock-message').textContent = !selectedSize ? 'Choose a size to check availability.' : variant?.stock > 0 ? `${variant.stock} available in this option.` : 'This option is currently sold out.';
+    $('.add-to-bag').disabled = Boolean((api && !api.available) || (selectedSize && !variant?.stock));
   }
   function galleryKeys(event) {
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
@@ -160,19 +170,33 @@
     $('#detail-image').src = photo(selectedProduct, selectedColor);
     $$('#gallery-thumbnails img').forEach((image) => { image.src = photo(selectedProduct, selectedColor); });
     $('#detail-colors').innerHTML = selectedProduct.colors.map((color) => `<button type="button" class="product-color-option ${color === selectedColor ? 'selected' : ''}" data-detail-color="${color}" aria-label="${colors[color].name}" aria-pressed="${color === selectedColor}"><span style="--swatch:${colors[color].hex}"></span><span>${colors[color].name}</span></button>`).join('');
-    galleryIndex = 0; updateGallery();
+    galleryIndex = 0; updateGallery(); updateAvailability();
     if (updateUrl) { const url = new URL(location.href); url.searchParams.set('color', selectedColor); history.replaceState(null, '', url); }
   }
-  function addToBag(event) {
+  async function persistBag(next) {
+    if (bagBusy) { toast('Your bag is updating. Please wait a moment.'); return false; }
+    if (api && !api.available) { toast('The store is unavailable. Refresh before updating your bag.'); return false; }
+    bagBusy = true;
+    try {
+      if (api) { const result = await api.setCart(next); bag = result.items; }
+      else bag = next;
+      updateBag(); return true;
+    } catch (error) {
+      try { bag = (await api.refreshCart()).items; updateBag(); } catch {}
+      toast(error.message); return false;
+    } finally { bagBusy = false; }
+  }
+  async function addToBag(event) {
     event.preventDefault();
     if (!selectedSize) { $('#size-error').hidden = false; $('#detail-sizes button').focus(); return; }
     const quantity = Number($('#product-quantity').value);
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) return;
-    const item = bag.find((entry) => entry.id === selectedProduct.id && entry.color === selectedColor && entry.size === selectedSize);
+    const next = bag.map((item) => ({ ...item }));
+    const item = next.find((entry) => entry.id === selectedProduct.id && entry.color === selectedColor && entry.size === selectedSize);
     if (item && item.quantity + quantity > 99) { toast('The limit is 99 of each piece. Adjust your bag quantity to add more.'); return; }
     if (item) item.quantity += quantity;
-    else bag.push({ id: selectedProduct.id, color: selectedColor, size: selectedSize, quantity });
-    updateBag(); $('#bag-dialog').showModal(); toast(`${selectedProduct.name} added to your bag.`);
+    else next.push({ id: selectedProduct.id, color: selectedColor, size: selectedSize, quantity });
+    if (await persistBag(next)) { $('#bag-dialog').showModal(); toast(`${selectedProduct.name} added to your bag.`); }
   }
   function updateBag() {
     const count = bag.reduce((sum, item) => sum + item.quantity, 0);
@@ -182,7 +206,8 @@
     $('#bag-total-count').textContent = `(${count})`;
     $('#bag-summary').hidden = !bag.length;
     $('#bag-subtotal').textContent = money(subtotal);
-    $('#shipping-progress').textContent = subtotal >= 150 ? 'Your equipment ships on us. Complimentary shipping unlocked.' : `${money(150 - subtotal)} away from complimentary shipping.`;
+    const threshold = (api?.settings.freeShippingCents ?? 15000) / 100;
+    $('#shipping-progress').textContent = subtotal >= threshold ? 'Your equipment ships on us. Complimentary shipping unlocked.' : `${money(threshold - subtotal)} away from complimentary shipping.`;
     $('#bag-items').innerHTML = bag.length ? bag.map((item, index) => {
       const product = catalog[item.id];
       return `<div class="bag-item"><a href="${productUrl(product, item.color)}"><img src="${photo(product, item.color)}" alt="${product.name} in ${colors[item.color].name}"></a><div class="bag-item-info"><h3><a href="${productUrl(product, item.color)}">${product.name}</a></h3><p>${colors[item.color].name} / ${item.size}</p><span class="bag-item-price">${money(product.price * item.quantity)}</span><button class="bag-item-remove" data-remove="${index}" aria-label="Remove ${product.name}">×</button><div class="quantity-control"><button data-quantity="${index}" data-change="-1" aria-label="Decrease ${product.name} quantity">−</button><span aria-label="Quantity">${item.quantity}</span><button data-quantity="${index}" data-change="1" aria-label="Increase ${product.name} quantity" ${item.quantity >= 99 ? 'disabled' : ''}>+</button></div></div></div>`;
@@ -190,11 +215,11 @@
     save('aurora-atlas-bag-v1', bag);
   }
   const information = {
-    shipping: ['A little peace of mind.', '<p>Our planned shipping policy includes complimentary standard shipping on orders of $150 or more, and 30-day returns on unworn equipment with original tags.</p><p>Aurora Atlas is a concept store. Shipping and order fulfillment will be available when the store launches.</p>'],
+    shipping: ['A little peace of mind.', `<p>Standard delivery is available within the United States. Shipping is ${money((api?.settings.shippingCents ?? 995) / 100)}, with complimentary delivery from ${money((api?.settings.freeShippingCents ?? 15000) / 100)}. Your full total is shown before placing your order.</p><p>Keep your order reference for help with your delivery or a return.</p>`],
     care: ['Keep your equipment going.', '<p>Wash cold and follow the care label supplied with your garment. Air dry fleece and spot clean carry goods. The product pages include more specific care information for each piece.</p>'],
     contact: ['Good conversations start here.', '<p>This is a concept collection, so a customer support inbox is not connected yet. Our product pages, size guide, and care notes can help you get to know the equipment.</p>'],
     size: ['Find your fit.', '<p>Use your body measurements, in centimeters, to find your size. Measure around the fullest part of your chest and your natural waist. This is a concept sizing guide; follow the supplier’s measurements for production garments.</p><table><thead><tr><th>Size</th><th>Chest</th><th>Waist</th></tr></thead><tbody><tr><td>XS</td><td>80–87</td><td>64–71</td></tr><tr><td>S</td><td>88–95</td><td>72–79</td></tr><tr><td>M</td><td>96–103</td><td>80–87</td></tr><tr><td>L</td><td>104–111</td><td>88–95</td></tr><tr><td>XL</td><td>112–119</td><td>96–103</td></tr></tbody></table>'],
-    checkout: ['Your next step.', '<p>This is a concept storefront. Your bag is saved in this browser, but online checkout and payments are not connected yet.</p><p>No order has been placed and no payment has been taken. You can keep exploring and editing your bag.</p>']
+    checkout: ['Ready for your next chapter.', '<p>Review your bag, then continue to checkout to choose delivery and payment.</p>']
   };
   document.addEventListener('click', (event) => {
     const target = event.target.closest('button,a'); if (!target) return;
@@ -202,7 +227,7 @@
     if (target.hasAttribute('data-filter')) { activeFilter = target.dataset.filter; renderCollection(); }
     if (target.hasAttribute('data-detail-color')) { selectedColor = target.dataset.detailColor; updateProductColor(); }
     if (target.hasAttribute('data-size')) {
-      selectedSize = target.dataset.size; $('#size-error').hidden = true;
+      selectedSize = target.dataset.size; $('#size-error').hidden = true; updateAvailability();
       $$('[data-size]').forEach((button) => { button.classList.toggle('selected', button === target); button.setAttribute('aria-pressed', String(button === target)); });
     }
     if (target.hasAttribute('data-gallery-index')) { galleryIndex = Number(target.dataset.galleryIndex); updateGallery(); }
@@ -210,14 +235,20 @@
     if (target.hasAttribute('data-purchase-step')) {
       const input = $('#product-quantity'); input.value = Math.max(1, Math.min(99, (Number(input.value) || 1) + Number(target.dataset.purchaseStep)));
     }
-    if (target.hasAttribute('data-remove')) { bag.splice(Number(target.dataset.remove), 1); updateBag(); }
+    if (target.hasAttribute('data-remove')) { persistBag(bag.filter((_, index) => index !== Number(target.dataset.remove))); }
     if (target.hasAttribute('data-quantity')) {
-      const index = Number(target.dataset.quantity); bag[index].quantity = Math.min(99, bag[index].quantity + Number(target.dataset.change));
-      if (bag[index].quantity <= 0) bag.splice(index, 1); updateBag();
+      const index = Number(target.dataset.quantity);
+      const next = bag.map((item) => ({ ...item }));
+      next[index].quantity = Math.min(99, next[index].quantity + Number(target.dataset.change));
+      persistBag(next.filter((item) => item.quantity > 0));
     }
     if (target.hasAttribute('data-info')) showInfo(...information[target.dataset.info]);
     if (target.id === 'size-guide-trigger') showInfo(...information.size);
-    if (target.id === 'checkout-trigger') showInfo(...information.checkout);
+    if (target.id === 'checkout-trigger') {
+      if (bagBusy) toast('Your bag is updating. Please wait a moment.');
+      else if (api && !api.available) toast('The store is unavailable. Refresh before checking out.');
+      else location.href = 'checkout.html';
+    }
     if (target.id === 'reset-collection') { activeFilter = 'all'; $('#product-search').value = ''; $('#product-sort').value = 'featured'; renderCollection(); }
     if (target.id === 'story-trigger') location.href = 'shop.html';
     if (target.closest('.mobile-nav')) {
@@ -237,11 +268,16 @@
     else location.href = 'shop.html?search=1';
   });
   $('#close-search')?.addEventListener('click', () => { $('.search-bar').hidden = true; $('#product-search').value = ''; renderCollection(); });
-  $('#newsletter-form')?.addEventListener('submit', (event) => {
+  $('#newsletter-form')?.addEventListener('submit', async (event) => {
     event.preventDefault(); if (!$('#newsletter-form').reportValidity()) return;
-    const saved = save('aurora-atlas-field-notes-v1', { email: $('#newsletter-email').value.trim(), savedAt: new Date().toISOString() });
-    $('#newsletter-message').textContent = saved ? 'Interest saved in this browser. Field notes will launch with the store.' : 'Field notes are coming soon. Subscriptions open when the store launches.';
-    $('#newsletter-email').value = '';
+    const button = $('#newsletter-form button'); button.disabled = true;
+    try {
+      if (!api?.available) throw new Error('The store is unavailable. Please try again shortly.');
+      const result = await api.request('/api/newsletter', { method: 'POST', body: { email: $('#newsletter-email').value.trim(), consent: $('#newsletter-consent').checked } });
+      $('#newsletter-message').textContent = result.message;
+      $('#newsletter-email').value = ''; $('#newsletter-consent').checked = false;
+    } catch (error) { $('#newsletter-message').textContent = error.message; }
+    finally { button.disabled = false; }
   });
   renderCollection();
   if (page === 'product') renderProduct();
@@ -251,7 +287,12 @@
     const rect = dialog.getBoundingClientRect();
     if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) dialog.close();
   }));
-  window.addEventListener('pageshow', () => {
+  window.addEventListener('aurora:cart', (event) => { bag = event.detail.items; updateBag(); });
+  window.addEventListener('pageshow', async (event) => {
+    if (api) {
+      if (event.persisted) try { bag = (await api.refreshCart()).items; updateBag(); } catch (error) { toast(error.message); }
+      return;
+    }
     const saved = readSaved('aurora-atlas-bag-v1', bag);
     if (Array.isArray(saved)) bag = saved.filter((item) => item && Object.hasOwn(catalog, item.id) && catalog[item.id].colors.includes(item.color) && catalog[item.id].sizes.includes(item.size) && Number.isInteger(item.quantity) && item.quantity > 0 && item.quantity <= 99);
     updateBag();

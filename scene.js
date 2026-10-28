@@ -1,6 +1,7 @@
 /* The homepage keeps its interactive 3D feature; shopping uses real photographs. */
-(() => {
+(async () => {
   'use strict';
+  await window.AuroraAPI?.ready;
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
   if (!$('#product-scene')) return;
