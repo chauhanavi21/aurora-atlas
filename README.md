@@ -1,6 +1,6 @@
 # Aurora Atlas
 
-A clothing storefront with a Node.js backend, persistent SQLite database, guest checkout, inventory management, and authenticated store administration. The homepage keeps its Three.js jacket; shopping pages use real reference photographs.
+A clothing storefront with a Node.js backend, local SQLite database, customer accounts, guest checkout, inventory management, and authenticated store administration. The homepage keeps its Three.js jacket; shopping pages use real reference photographs.
 
 ## Run locally
 
@@ -26,9 +26,10 @@ An administrator may already exist in this workspace; use the existing credentia
 
 - Database catalog with 20 sample products and stock for every color and size.
 - Search, categories, sorting, photo galleries, zoom, dedicated product pages, and live availability.
-- Server-persisted guest bags tied to HttpOnly session cookies, with prices loaded from the API. Valid pre-backend bags are imported once.
+- Customer signup, sign-in, sign-out, profile names, password changes, local password recovery, and private order history.
+- Server-persisted bags tied to HttpOnly session cookies, with prices loaded from the API. Account bags persist across devices; signing in merges a guest bag within stock limits. Valid pre-backend guest bags are imported once.
 - Checkout with validated US delivery details, server-calculated USD totals, shipping, configured tax, and **cash on delivery enabled by default**.
-- Saved order confirmations restricted to the customer's session. Repeated checkout submissions return the same order.
+- Saved order confirmations restricted to the customer's account or original guest session. Repeated checkout submissions return the same order, including after signing back in.
 - Atomic stock deductions, rollback on insufficient stock, and stock restoration on cancellation or reservation expiry.
 - Admin login, latest 100 orders, fulfillment, COD cancellation, prices, available inventory, subscriber list, and an audit log of changes.
 - Database-persisted newsletter signups with explicit consent and duplicate prevention.
@@ -36,7 +37,17 @@ An administrator may already exist in this workspace; use the existing credentia
 
 The admin COD fulfillment action confirms **delivery is complete and payment has been collected**. Confirmed COD orders can be cancelled with stock restoration. Paid online orders can be marked fulfilled; refunds must be managed through Stripe. A late payment after a reservation was cancelled becomes **payment_review**, never automatic fulfillment.
 
-Guest confirmations remain available in the ordering browser for the session's 30-day lifetime. Order and newsletter records survive server restarts. Customer accounts and outbound email delivery are not included: confirmation emails and marketing messages are not sent automatically.
+Guest confirmations remain available in the ordering browser for the session's 30-day lifetime. Accounts, bags, orders, and newsletter records survive server restarts. Confirmation emails and marketing messages are not sent automatically.
+
+## Customer accounts
+
+Open **http://localhost:3000/signup.html** to create an account, **/login.html** to sign in, and **/account.html** for profile details, order history, password changes, and sign-out. The store header and checkout link to these pages. Checkout also works without an account; signing in or creating an account attaches only that browser's guest orders, never unrelated orders with a matching email address.
+
+Names, email addresses, password length/strength, and confirmation are validated in the form and again by the API. Email addresses are normalized and unique without case sensitivity. Passwords accept 12–128 Unicode characters, preserve spaces, and reject common or email-based choices. Each password gets its own salt and scrypt hash; plaintext passwords are never saved. Email ownership verification and email changes are not implemented.
+
+Customer sessions last 12 hours, or 30 days with **Keep me signed in**. Session secrets stay in HttpOnly, SameSite cookies, with only their hashes in SQLite. Login, logout, and password changes rotate the session and CSRF token. Password changes require the current password and revoke other devices. Failed logins have IP and persistent account limits. Signing out clears that browser's account access while saving its account bag for the next login.
+
+**Local password recovery:** request a link at **/forgot-password.html**. In development, the server writes a private JSON message containing the link to **.data/mail-outbox/**. The store owner opens that file locally and uses its `resetUrl`; no email is sent. Links expire after 30 minutes, work once, and revoke all customer sessions when used. Only token hashes enter SQLite, and the API never returns recovery secrets. The outbox is ignored by Git and inaccessible over HTTP. Set `AUTH_LOCAL_RECOVERY=false` to disable it. Production disables this local mechanism; automatic recovery requires connecting a delivery adapter in `createApp` dependencies.
 
 ## Payments and delivery
 
@@ -55,7 +66,7 @@ Cards and supported card wallets use Stripe's hosted checkout; card data never p
 
 ## Database and public hosting
 
-The database is **.data/aurora.sqlite**. Missing products/options are seeded from catalog.js; restarting never resets saved prices or stock. **Initial stock of 20 per variant is illustrative. Set actual inventory before selling.** Prices and totals use integer cents.
+The database is **.data/aurora.sqlite**, stored on this computer; no external database or authentication service is required. The account migration adds customer, bag, and recovery tables while preserving the existing catalog, orders, sessions, and admin. Missing products/options are seeded from catalog.js; restarting never resets saved prices or stock. **Initial stock of 20 per variant is illustrative. Set actual inventory before selling.** Prices and totals use integer cents.
 
 Use a Node host with persistent disk storage. GitHub Pages and other static-only hosting cannot run this backend. Before public deployment:
 
@@ -72,7 +83,7 @@ Only explicitly public files are served. Source, secrets, databases, and depende
 npm.cmd test
 ~~~
 
-API and DOM integration tests use an isolated real server and in-memory database. They cover server pricing, stock races, duplicate orders, restart persistence, private orders, admin authorization, CSRF/origin checks, Stripe signatures and duplicate webhooks, newsletter consent, all 43 photos, filters, bags, checkout confirmation, admin pricing/stock, and sold-out controls. Test orders never enter the running store's database.
+API and DOM integration tests use isolated real servers and in-memory databases; migration/restart tests use temporary SQLite files. They cover signup validation and duplicate races, salted password hashes, session rotation, account isolation, bag merging, password changes, private single-use recovery, throttling, database migration, and the full account forms. Commerce coverage includes server pricing, stock races, duplicate orders, private orders, admin authorization, CSRF/origin checks, Stripe signatures and duplicate webhooks, newsletter consent, all 43 photos, filters, checkout confirmation, admin pricing/stock, and sold-out controls. Test accounts and orders never enter the running store's database.
 
 For Chrome layout checks, start the app and run:
 
