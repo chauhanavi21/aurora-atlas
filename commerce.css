@@ -1,4 +1,8 @@
 /* Checkout and store management share the storefront's existing type and palette. */
+.admin-nav-link{font-size:10px;white-space:nowrap;color:var(--lime)}
+.product-meta h3,.product-purchase h1,.bag-item h3,#hero-heading,#world-heading,.inventory-form h2{overflow-wrap:anywhere}
+.photo-art img[src$=".webp"],.gallery-photo img[src$=".webp"],.gallery-thumbnails img[src$=".webp"]{object-fit:contain;background:#f1f0e9}
+@media(max-width:1100px){.header-actions .admin-nav-link{display:none}}
 .account-link{display:inline-flex;align-items:center;gap:7px;font-size:11px;white-space:nowrap}.account-link svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.4}.account-link:hover{color:var(--lime)}
 @media(max-width:1300px){.header-actions .location{display:none}}
 @media(min-width:761px) and (max-width:1000px){.desktop-nav{display:none}.mobile-menu-trigger{display:grid}.mobile-nav{top:122px}}

@@ -13,7 +13,7 @@
     $('.scene-fallback svg path').setAttribute('fill', colors[color].hex);
     $('#product-scene').setAttribute('aria-label', 'Interactive Boreal puffer jacket in ' + colors[color].name);
     $('.hero-feature p').textContent = colors[color].name + ' / Everyday insulation';
-    $('.hero-feature [data-product]').href = productUrl(catalog.boreal, color);
+    if (catalog.boreal) $('.hero-feature [data-product]').href = productUrl(catalog.boreal, color);
     $$('[data-hero-color]').forEach((swatch) => {
       swatch.classList.toggle('selected', swatch === button);
       swatch.setAttribute('aria-pressed', String(swatch === button));
