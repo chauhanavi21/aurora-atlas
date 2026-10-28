@@ -24,20 +24,35 @@ An administrator may already exist in this workspace; use the existing credentia
 
 ## What works
 
-- Database catalog with 20 sample products and stock for every color and size.
+- Database catalog with **70 sample products** (the original 20 plus 50 additional apparel, footwear, and accessories) and 191 locally saved product photographs.
 - Search, categories, sorting, photo galleries, zoom, dedicated product pages, and live availability.
 - Customer signup, sign-in, sign-out, profile names, password changes, local password recovery, and private order history.
 - Server-persisted bags tied to HttpOnly session cookies, with prices loaded from the API. Account bags persist across devices; signing in merges a guest bag within stock limits. Valid pre-backend guest bags are imported once.
 - Checkout with validated US delivery details, server-calculated USD totals, shipping, configured tax, and **cash on delivery enabled by default**.
 - Saved order confirmations restricted to the customer's account or original guest session. Repeated checkout submissions return the same order, including after signing back in.
 - Atomic stock deductions, rollback on insufficient stock, and stock restoration on cancellation or reservation expiry.
-- Admin login, latest 100 orders, fulfillment, COD cancellation, prices, available inventory, subscriber list, and an audit log of changes.
+- Admin dashboard for product creation/editing, photo uploads, publication, all variant stock, prices, searchable orders/customers, shipping/tracking, subscribers, store content/settings, and activity history.
 - Database-persisted newsletter signups with explicit consent and duplicate prevention.
 - Stripe Checkout integration, hidden until both private keys are configured.
 
-The admin COD fulfillment action confirms **delivery is complete and payment has been collected**. Confirmed COD orders can be cancelled with stock restoration. Paid online orders can be marked fulfilled; refunds must be managed through Stripe. A late payment after a reservation was cancelled becomes **payment_review**, never automatic fulfillment.
+The admin COD fulfillment action confirms **delivery is complete and payment has been collected**. Marking an order shipped does not collect payment. Confirmed COD orders can be cancelled with stock restoration. Paid online orders can be marked fulfilled; refunds must be managed through Stripe. A late payment after a reservation was cancelled becomes **payment_review**; an admin can approve it only after the server successfully reserves inventory again.
 
 Guest confirmations remain available in the ordering browser for the session's 30-day lifetime. Accounts, bags, orders, and newsletter records survive server restarts. Confirmation emails and marketing messages are not sent automatically.
+
+## Store administration
+
+Open **http://localhost:3000/admin.html** and use the private **.data/admin-credentials.txt** created during setup. This file contains the initial password; after changing it in the dashboard, use your new password. Customer accounts cannot access store management. Admin sessions expire after 12 hours, and every write requires a CSRF token and an allowed origin.
+
+- **Products:** search all published/draft/archived products; create new products; edit names, descriptions, categories, features, care, sizes, colors, badges, prices, and photography. Product IDs are permanent. Publish/unpublish controls visibility without losing historical orders. Old option rows remain private so cancellations can restore stock safely.
+- **Photos:** upload up to three JPEG, PNG, or WebP images per color, each up to 2 MB. Photos are stored in **.data/uploads/** and served only through generated **/media/** URLs. You can also reuse an existing local photo path. Uploaded photos are not committed to Git; include them in your store backups.
+- **Inventory & pricing:** find a product, choose any option, and update its available quantity and price. Low-stock and sold-out filters help locate options. The full product editor changes all variant quantities together. New options start at zero until stock is entered. Stock is never reserved merely by adding to a bag.
+- **Orders:** search by reference/customer, filter by status, and page through all orders. Save tracking details visible to the customer and internal notes visible only to admins. Mark orders shipped or delivered; COD delivery requires confirmation that payment was collected. Cancel unshipped COD orders to restore inventory. Order line items and totals preserve their checkout values.
+- **Customers:** search accounts, correct names, find their orders, revoke all sessions, and disable/enable account access. Disabling an account also revokes recovery links; it preserves its order history. Email ownership changes are unavailable.
+- **Field notes:** search, paginate, remove subscribers, and export all subscribers to CSV. The export protects against spreadsheet formulas. Messages are not sent automatically.
+- **Store & homepage:** edit announcements, hero/story/newsletter copy, featured products, footer tagline, support email, shipping/return/care information, free-shipping threshold, delivery charges, tax, COD availability, and checkout/subscription switches. Archived featured products stay hidden. Changes appear on the next storefront page load; checkout recalculates saved settings and rejects outdated totals.
+- **Activity & security:** browse a persistent record of admin changes and change your administrator password. A password change signs out other admin sessions.
+
+Store settings are saved in SQLite. Shipping, tax, COD, and support values in .env are initial defaults; later edits belong in the dashboard. Stripe secrets, server ports, and database paths remain private server configuration. The dashboard does not book carriers, send emails, or collect COD funds on your behalf.
 
 ## Customer accounts
 
@@ -51,7 +66,7 @@ Customer sessions last 12 hours, or 30 days with **Keep me signed in**. Session 
 
 ## Payments and delivery
 
-COD records an order without collecting an online payment. The full amount is due on delivery. Standard US shipping defaults to **$9.95**, free from **$150**. Subtotal, shipping, tax, and total appear before submitting.
+COD records an order without collecting an online payment. The full amount is due on delivery. Standard US shipping initially defaults to **$9.95**, free from **$150**; the admin dashboard controls saved delivery rates. Subtotal, shipping, tax, and total appear before submitting.
 
 To connect Stripe later:
 
@@ -66,7 +81,7 @@ Cards and supported card wallets use Stripe's hosted checkout; card data never p
 
 ## Database and public hosting
 
-The database is **.data/aurora.sqlite**, stored on this computer; no external database or authentication service is required. The account migration adds customer, bag, and recovery tables while preserving the existing catalog, orders, sessions, and admin. Missing products/options are seeded from catalog.js; restarting never resets saved prices or stock. **Initial stock of 20 per variant is illustrative. Set actual inventory before selling.** Prices and totals use integer cents.
+The database is **.data/aurora.sqlite**, stored on this computer; no external database or authentication service is required. Automatic migrations preserve the existing catalog, accounts, orders, sessions, and admin while adding management settings, product versions, account status, and tracking. Missing products are seeded from catalog.js once, with their initial options. Restarting never resets admin changes or recreates retired options. **Initial stock of 20 per sample variant is illustrative. Set actual inventory before selling.** Prices and totals use integer cents.
 
 Use a Node host with persistent disk storage. GitHub Pages and other static-only hosting cannot run this backend. Before public deployment:
 
@@ -83,7 +98,7 @@ Only explicitly public files are served. Source, secrets, databases, and depende
 npm.cmd test
 ~~~
 
-API and DOM integration tests use isolated real servers and in-memory databases; migration/restart tests use temporary SQLite files. They cover signup validation and duplicate races, salted password hashes, session rotation, account isolation, bag merging, password changes, private single-use recovery, throttling, database migration, and the full account forms. Commerce coverage includes server pricing, stock races, duplicate orders, private orders, admin authorization, CSRF/origin checks, Stripe signatures and duplicate webhooks, newsletter consent, all 43 photos, filters, checkout confirmation, admin pricing/stock, and sold-out controls. Test accounts and orders never enter the running store's database.
+API and DOM integration tests use isolated real servers and in-memory databases; migration/restart and upload tests use temporary files. Coverage includes authentication, account isolation, all 70 products and 191 photos, product creation/editing/publication, image uploads, archived products, retired variants, stock races, duplicate orders, server pricing, store settings, private notes/tracking, customer controls, subscriber pagination, admin password changes, CSRF/origin checks, and signed Stripe webhooks. Tests exercise dashboard forms through the real API, including escaped product/content text. Test accounts and orders never enter the running store's database.
 
 For Chrome layout checks, start the app and run:
 
@@ -95,8 +110,10 @@ Chrome must be installed at the standard Windows path. PREVIEW_URL can override 
 
 ## Photography and catalog
 
-The 43 local images are **UNIQLO reference photography**, not Aurora Atlas inventory photos. Credits and URLs are in **assets/photos/sources.json**; product pages disclose their use. Rights remain with their owners. Use your own approved product photos for commercial sales. Gallery details are labeled crops of the selected color's photo.
+The original 43 images are **UNIQLO reference photography**; the 50 additions use 148 product photos from **DummyJSON**, with credit manifests in **assets/photos/sources.json** and **assets/photos/sample-sources.json**. These are sample listings, not Aurora Atlas inventory photos. Product pages disclose reference use. Rights remain with their owners; use your own approved product photos for commercial sales. New sample listings show their actual alternate views, while missing extra views fall back to labeled crops. The "As pictured" option avoids inventing color variants for a reference photograph.
 
-Catalog.js supplies initial product definitions and photo paths. Database prices and stock drive the running store. Add new product definitions and matching **assets/photos/<id>-<color>-front.jpg** files, then restart to seed new options. Add category filters/navigation when needed.
+Catalog.js supplies initial product definitions and photo paths. The database drives the running catalog, prices, stock, publication state, and settings. Use the product editor to add products without editing source files. Categories include outerwear, essentials, bottoms, accessories, and footwear; shoe products have their own size guidance.
 
 **node scripts/download-photos.mjs** restores missing reference photos. Pass a product ID to download one item, or --refresh to replace cached files. The complete source manifest is written only when every listed photo exists.
+
+**node scripts/import-samples.mjs** restores the 50 additional sample records and their locally cached photographs from DummyJSON. It updates only the marked sample block in catalog.js and its credit manifest. Existing database products are preserved when the server restarts, so this command does not overwrite admin edits.
