@@ -183,6 +183,39 @@
         "Upper detail",
         "Fabric detail"
       ]
+    },
+    {
+      "id": "cloud",
+      "name": "Cloud Crew Sweat",
+      "type": "Off-duty comfort, on repeat",
+      "price": 78,
+      "colors": [
+        "chalk",
+        "obsidian"
+      ],
+      "badge": "SLOW MORNING FAVORITE",
+      "description": "For the slower side of the week. A relaxed sweatshirt with a round neck, easy sleeves, and a softly gathered hem. Good company for coffee and a long way home.",
+      "features": [
+        "Round neckline",
+        "Relaxed sleeves",
+        "Gathered hem"
+      ],
+      "details": "A relaxed crew sweatshirt with long sleeves and ribbed edges. A slightly shortened body gives the silhouette its easy shape.",
+      "fit": "A relaxed fit with a slightly cropped hem. Choose your usual size; size up if you prefer extra length.",
+      "category": "essentials",
+      "sizes": [
+        "XS",
+        "S",
+        "M",
+        "L",
+        "XL"
+      ],
+      "care": "Follow the original garment care label. Wash with similar colors, reshape gently, and dry away from direct heat.",
+      "gallery": [
+        "Full view",
+        "Upper detail",
+        "Fabric detail"
+      ]
     }
   ];
   const catalog = Object.fromEntries(products.map((product) => [product.id, product]));
