@@ -36,6 +36,18 @@
     if (!$('#toast')) document.body.insertAdjacentHTML('beforeend', '<div id="toast" class="toast" role="status" aria-live="polite"></div>');
   }
   mountSharedLayout();
+  $('.header-actions .bag-trigger').insertAdjacentHTML('beforebegin', '<a class="account-link" href="login.html"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 21v-2a7.5 7.5 0 0 1 15 0v2"/></svg><span class="account-label">Sign in</span></a>');
+  $('.mobile-nav').insertAdjacentHTML('beforeend', '<a class="account-nav-link" href="login.html">Sign in ↗</a>');
+  function updateAccountLinks() {
+    $$('.account-link,.account-nav-link').forEach((link) => {
+      link.href = api?.user ? 'account.html' : 'login.html';
+      link.setAttribute('aria-label', api?.user ? `Your account, ${api.user.name}` : 'Sign in to your account');
+      if (link.classList.contains('account-link')) link.querySelector('.account-label').textContent = api?.user ? 'Account' : 'Sign in';
+      else link.textContent = api?.user ? 'Your account ↗' : 'Sign in ↗';
+    });
+  }
+  updateAccountLinks();
+  window.addEventListener('aurora:auth', updateAccountLinks);
   $$('[data-category-count]').forEach((element) => {
     const category = element.dataset.categoryCount;
     const count = category === 'all' ? products.length : products.filter((product) => product.category === category).length;
@@ -290,7 +302,7 @@
   window.addEventListener('aurora:cart', (event) => { bag = event.detail.items; updateBag(); });
   window.addEventListener('pageshow', async (event) => {
     if (api) {
-      if (event.persisted) try { bag = (await api.refreshCart()).items; updateBag(); } catch (error) { toast(error.message); }
+      if (event.persisted) try { await api.refreshSession(); bag = (await api.refreshCart()).items; updateBag(); } catch (error) { toast(error.message); }
       return;
     }
     const saved = readSaved('aurora-atlas-bag-v1', bag);
@@ -298,4 +310,8 @@
     updateBag();
   });
   if (page === 'shop' && params.has('search')) $('#product-search').focus();
+  window.addEventListener('focus', async () => {
+    if (!api?.available || bagBusy) return;
+    try { await api.refreshSession(); await api.refreshCart(); } catch {}
+  });
 })();

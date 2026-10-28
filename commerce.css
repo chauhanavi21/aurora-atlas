@@ -1,4 +1,9 @@
 /* Checkout and store management share the storefront's existing type and palette. */
+.account-link{display:inline-flex;align-items:center;gap:7px;font-size:11px;white-space:nowrap}.account-link svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.4}.account-link:hover{color:var(--lime)}
+@media(max-width:1300px){.header-actions .location{display:none}}
+@media(min-width:761px) and (max-width:1000px){.desktop-nav{display:none}.mobile-menu-trigger{display:grid}.mobile-nav{top:122px}}
+@media(max-width:760px){.account-link{font-size:10px;gap:5px}.header-actions{gap:12px}}
+@media(max-width:420px){.account-link .account-label{display:none}.account-link svg{width:20px;height:20px}.header-actions{gap:10px}}
 .connection-notice{padding:13px 5%;font-size:12px;line-height:1.7;background:#342715;color:#f2d5aa}
 .commerce-page{padding-top:55px;padding-bottom:85px;min-height:70vh}
 .commerce-heading{margin-bottom:35px;max-width:950px}

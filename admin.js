@@ -28,7 +28,7 @@
     const button = $('#admin-login button'); button.disabled = true; error('');
     try {
       const result = await api.request('/api/admin/login', { method: 'POST', body: Object.fromEntries(new FormData(event.currentTarget)) });
-      api.csrfToken = result.csrfToken; api.admin = true; $('#admin-login').reset(); await load();
+      api.applyAuth(result); $('#admin-login').reset(); await load();
     } catch (failure) { error(failure.message); }
     finally { button.disabled = false; }
   });
