@@ -150,6 +150,39 @@
         "Upper detail",
         "Fabric detail"
       ]
+    },
+    {
+      "id": "studio",
+      "name": "Studio Box Tee",
+      "type": "Clean lines. Everyday ease.",
+      "price": 45,
+      "colors": [
+        "obsidian",
+        "navy"
+      ],
+      "description": "A new angle on the everyday tee. A boxy outline, a neat crew neck, and a quiet palette for days that move between work and whatever comes next.",
+      "features": [
+        "Boxy silhouette",
+        "Ribbed crew neck",
+        "Wide short sleeves"
+      ],
+      "details": "A structured-looking crew tee with a straight body and wide short sleeves. Keep it simple with tailored trousers or easy everyday pants.",
+      "fit": "A boxy, relaxed fit. Check the chest guide and choose your usual size for a roomy silhouette.",
+      "category": "essentials",
+      "badge": "",
+      "sizes": [
+        "XS",
+        "S",
+        "M",
+        "L",
+        "XL"
+      ],
+      "care": "Follow the original garment care label. Wash with similar colors, reshape gently, and dry away from direct heat.",
+      "gallery": [
+        "Full view",
+        "Upper detail",
+        "Fabric detail"
+      ]
     }
   ];
   const catalog = Object.fromEntries(products.map((product) => [product.id, product]));
