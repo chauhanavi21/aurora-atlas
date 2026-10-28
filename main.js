@@ -6,7 +6,7 @@
   const { products, catalog, colors, photo, productUrl } = window.AuroraCatalog;
   const page = document.body.dataset.page || 'home';
   const params = new URLSearchParams(location.search);
-  const categories = { all: 'All equipment', outerwear: 'Outerwear', essentials: 'Essentials', accessories: 'Accessories' };
+  const categories = { all: 'All equipment', outerwear: 'Outerwear', essentials: 'Essentials', bottoms: 'Bottoms', accessories: 'Accessories' };
   const money = (amount) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
   let activeFilter = Object.hasOwn(categories, params.get('category')) ? params.get('category') : 'all';
   let selectedProduct = null, selectedColor = null, selectedSize = null, galleryIndex = 0, toastTimer;
@@ -23,7 +23,7 @@
   function mountSharedLayout() {
     if ($('[data-site-header]')) $('[data-site-header]').innerHTML = `
       <div class="announcement"><span>LESS FORECAST. MORE POSSIBILITY.</span><span>Complimentary shipping on orders $150+ <span aria-hidden="true">↗</span></span><span>DESIGNED TO GO FURTHER.</span></div>
-      <header class="site-header"><a class="brand" href="index.html" aria-label="Aurora Atlas home"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M5 30 17 8h6l12 22H22l-2-5-3 5Zm10-7h10L20 13Z" fill="currentColor"/></svg><span>AURORA<span class="brand-second">ATLAS<span class="brand-dot">®</span></span></span></a><nav class="desktop-nav" aria-label="Main navigation"><a href="shop.html" data-nav-filter="all">Shop all <span>↗</span></a><a href="shop.html?category=outerwear" data-nav-filter="outerwear">Outerwear</a><a href="shop.html?category=essentials" data-nav-filter="essentials">Essentials</a><a href="index.html#our-world">Our world</a></nav><div class="header-actions"><span class="location">EARTH, EST. 2024</span><button class="icon-button search-trigger" aria-label="Search collection"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg></button><button class="bag-trigger" aria-label="Open shopping bag">Bag <span class="bag-count">0</span></button><button class="icon-button mobile-menu-trigger" aria-label="Open menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16M4 16h16"/></svg></button></div></header><nav class="mobile-nav" aria-label="Mobile navigation" hidden><a href="shop.html">Shop all ↗</a><a href="shop.html?category=outerwear">Outerwear</a><a href="shop.html?category=essentials">Essentials</a><a href="shop.html?category=accessories">Accessories</a><a href="index.html#our-world">Our world</a></nav>`;
+      <header class="site-header"><a class="brand" href="index.html" aria-label="Aurora Atlas home"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M5 30 17 8h6l12 22H22l-2-5-3 5Zm10-7h10L20 13Z" fill="currentColor"/></svg><span>AURORA<span class="brand-second">ATLAS<span class="brand-dot">®</span></span></span></a><nav class="desktop-nav" aria-label="Main navigation"><a href="shop.html" data-nav-filter="all">Shop all <span>↗</span></a><a href="shop.html?category=outerwear" data-nav-filter="outerwear">Outerwear</a><a href="shop.html?category=essentials" data-nav-filter="essentials">Essentials</a><a href="shop.html?category=bottoms" data-nav-filter="bottoms">Bottoms</a><a href="index.html#our-world">Our world</a></nav><div class="header-actions"><span class="location">EARTH, EST. 2024</span><button class="icon-button search-trigger" aria-label="Search collection"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg></button><button class="bag-trigger" aria-label="Open shopping bag">Bag <span class="bag-count">0</span></button><button class="icon-button mobile-menu-trigger" aria-label="Open menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16M4 16h16"/></svg></button></div></header><nav class="mobile-nav" aria-label="Mobile navigation" hidden><a href="shop.html">Shop all ↗</a><a href="shop.html?category=outerwear">Outerwear</a><a href="shop.html?category=essentials">Essentials</a><a href="shop.html?category=bottoms">Bottoms</a><a href="shop.html?category=accessories">Accessories</a><a href="index.html#our-world">Our world</a></nav>`;
     if ($('[data-site-footer]')) $('[data-site-footer]').innerHTML = `
       <footer class="site-footer section-wrap"><div class="footer-top"><a class="brand footer-brand" href="index.html">AURORA ATLAS<span>®</span></a><span>EQUIPMENT FOR THE EVERYDAY EXPLORER.</span><a href="#">BACK TO TOP ↑</a></div><div class="footer-bottom"><span>© 2026 Aurora Atlas</span><div><button data-info="shipping">Shipping & returns</button><button data-info="care">Product care</button><button data-info="contact">Get in touch</button></div><span>DESIGNED WITH INTENTION. WORN WITH CURIOSITY.</span></div></footer>`;
     if (!$('#bag-dialog')) document.body.insertAdjacentHTML('beforeend', `
@@ -32,6 +32,12 @@
     if (!$('#toast')) document.body.insertAdjacentHTML('beforeend', '<div id="toast" class="toast" role="status" aria-live="polite"></div>');
   }
   mountSharedLayout();
+  $('[data-category-count]').forEach((element) => {
+    const category = element.dataset.categoryCount;
+    const count = category === 'all' ? products.length : products.filter((product) => product.category === category).length;
+    element.textContent = String(count).padStart(2, '0');
+  });
+  $('[data-catalog-total]').forEach((element) => { element.textContent = String(products.length); });
 
   function toast(message) {
     clearTimeout(toastTimer);
