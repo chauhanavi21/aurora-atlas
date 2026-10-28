@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { openStore, HttpError, passwordMatchesAsync, passwordHash, email, text, integer } from './store.mjs';
 import { createAuthentication, publicCustomer } from './auth.mjs';
+import { createManagement } from './management.mjs';
 
 export const root = fileURLToPath(new URL('../', import.meta.url));
 export function configuration(env = process.env) {
@@ -19,7 +20,7 @@ export function configuration(env = process.env) {
     stripeSecret: env.STRIPE_SECRET_KEY || '', stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET || '',
     stripeEnabled: Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET), supportEmail: env.SUPPORT_EMAIL || '',
     localPasswordRecovery: env.NODE_ENV !== 'production' && env.AUTH_LOCAL_RECOVERY !== 'false',
-    authOutboxPath: resolve(root, '.data/mail-outbox')
+    authOutboxPath: resolve(root, '.data/mail-outbox'), uploadsPath: resolve(root,'.data/uploads')
   };
 }
 export function createApp(config = configuration(), dependencies = {}) {
@@ -27,25 +28,25 @@ export function createApp(config = configuration(), dependencies = {}) {
   const remoteFetch = dependencies.fetch || fetch;
   const rateLimits = new Map();
   const dummyHash = passwordHash('unavailable-account');
-  const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.png': 'image/png', '.json': 'application/json; charset=utf-8', '.woff2': 'font/woff2' };
-  const publicFiles = new Set(['index.html','shop.html','product.html','checkout.html','order.html','admin.html','login.html','signup.html','account.html','forgot-password.html','reset-password.html','auth.js','auth.css','auth-validation.js','catalog.js','api.js','main.js','scene.js','checkout.js','order.js','admin.js','style.css','pages.css','commerce.css','favicon.svg']);
+  const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.jpeg':'image/jpeg', '.png': 'image/png', '.webp':'image/webp', '.json': 'application/json; charset=utf-8', '.woff2': 'font/woff2' };
+  const publicFiles = new Set(['index.html','shop.html','product.html','checkout.html','order.html','admin.html','login.html','signup.html','account.html','forgot-password.html','reset-password.html','auth.js','auth.css','auth-validation.js','catalog.js','api.js','main.js','scene.js','checkout.js','order.js','admin.js','admin.css','style.css','pages.css','commerce.css','favicon.svg']);
   function send(res, status, value) {
     res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(JSON.stringify(value));
   }
   function limit(req, key, max, duration = 60000) {
     const id = `${req.socket.remoteAddress}:${key}`;
-    const now = Date.now();
+    const now = (dependencies.now || Date.now)();
     if (rateLimits.size > 5000) for (const [key, value] of rateLimits) if (value.until < now) rateLimits.delete(key);
     let entry = rateLimits.get(id);
     if (!entry || entry.until < now) { entry = { count: 0, until: now + duration }; rateLimits.set(id, entry); }
     if (++entry.count > max) throw new HttpError(429, 'Too many requests. Please wait before trying again.');
   }
-  async function body(req, raw = false) {
+  async function body(req, raw = false, maximum = 65536) {
     const chunks = []; let length = 0;
     for await (const chunk of req) {
       length += chunk.length;
-      if (length > 65536) throw new HttpError(413, 'Request is too large.');
+      if (length > maximum) throw new HttpError(413, 'Request is too large.');
       chunks.push(chunk);
     }
     const bytes = Buffer.concat(chunks);
@@ -73,11 +74,11 @@ export function createApp(config = configuration(), dependencies = {}) {
     if (!current.admin_id) throw new HttpError(401, 'Sign in as the store administrator.');
     return current.admin_id;
   }
-  function audit(adminId, action, target) { store.db.prepare('INSERT INTO audit_log(admin_id,action,target,created) VALUES(?,?,?,?)').run(adminId, action, target, Date.now()); }
   function settings() {
-    return { currency: 'usd', shippingCents: config.shippingCents, freeShippingCents: config.freeShippingCents, taxRateBps: config.taxRateBps, allowCod: config.allowCod, stripeEnabled: config.stripeEnabled, supportEmail: config.supportEmail, localPasswordRecovery: config.localPasswordRecovery, countries: ['US'] };
+    return { ...store.settings(), currency: 'usd', stripeEnabled: config.stripeEnabled, localPasswordRecovery: config.localPasswordRecovery, countries: ['US'] };
   }
   const authentication = createAuthentication({ store, config, send, cookie, body, limit, dummyHash, dependencies });
+  const management = createManagement({ store, config, root, send, body, cookie, limit, authentication });
   async function stripeCheckout(row) {
     if (row.status !== 'awaiting_payment') throw new HttpError(409, 'This checkout is no longer awaiting payment.');
     const data = new URLSearchParams({ mode: 'payment', success_url: `${config.publicUrl}/order.html?id=${row.id}`, cancel_url: `${config.publicUrl}/checkout.html?resume=${row.id}`, customer_email: JSON.parse(row.customer).email, client_reference_id: row.id, 'metadata[order_id]': row.id });
@@ -146,6 +147,7 @@ export function createApp(config = configuration(), dependencies = {}) {
     }
     if (path === '/api/newsletter' && req.method === 'POST') {
       limit(req, 'newsletter', 5);
+      if (!store.settings().newsletterEnabled) throw new HttpError(503,'Newsletter subscriptions are currently closed.');
       const input = await body(req);
       if (input.consent !== true) throw new HttpError(400, 'Confirm that you want to receive field notes.');
       store.db.prepare('INSERT OR IGNORE INTO subscribers VALUES(?,?)').run(email(input.email), Date.now());
@@ -189,54 +191,23 @@ export function createApp(config = configuration(), dependencies = {}) {
       limit(req, 'login', 5, 15 * 60000);
       const input = await body(req);
       const account = store.db.prepare('SELECT * FROM admins WHERE email=?').get(email(input.email));
-      const password = text(input.password, 'password', 1, 128);
+      const password = input.password;
+      if (typeof password !== 'string' || !password.length || [...password].length > 128) throw new HttpError(400,'Enter your password.');
       if (!await passwordMatchesAsync(password, account?.password_hash || dummyHash) || !account) throw new HttpError(401, 'Email or password is incorrect.');
-      const rotated = authentication.rotateSession(current, { adminId: account.id });
+      if (store.db.prepare('SELECT password_hash FROM admins WHERE id=?').get(account.id)?.password_hash !== account.password_hash) throw new HttpError(401,'Email or password is incorrect.');
+      const rotated = authentication.rotateSession(current, { adminId: account.id, lifetime:12*3600000 });
       cookie(res, rotated.secret, rotated.session.expires);
       return send(res, 200, { csrfToken: rotated.session.csrf, admin: true, user: publicCustomer(authentication.customer(rotated.session)), cart: store.cart(rotated.session.id) });
     }
     if (path.startsWith('/api/admin/')) {
-      const adminId = admin(current);
+      admin(current);
       if (path === '/api/admin/logout' && req.method === 'POST') {
         await body(req);
         const rotated = authentication.rotateSession(current, { adminId: null });
         cookie(res, rotated.secret, rotated.session.expires);
         return send(res, 200, { admin: false, csrfToken: rotated.session.csrf });
       }
-      if (path === '/api/admin/overview' && req.method === 'GET') {
-        const orders = store.db.prepare('SELECT * FROM orders ORDER BY created DESC LIMIT 100').all().map((row) => store.publicOrder(row));
-        return send(res, 200, { orders, products: store.products(), subscribers: store.db.prepare('SELECT email,created FROM subscribers ORDER BY created DESC LIMIT 100').all(), counts: { orders: store.db.prepare('SELECT COUNT(*) AS count FROM orders').get().count, subscribers: store.db.prepare('SELECT COUNT(*) AS count FROM subscribers').get().count } });
-      }
-      const variantPath = /^\/api\/admin\/products\/([a-z0-9-]+)$/.exec(path);
-      if (variantPath && req.method === 'PATCH') {
-        const input = await body(req);
-        store.transaction(() => {
-          const product = store.db.prepare('SELECT * FROM products WHERE id=?').get(variantPath[1]);
-          if (!product) throw new HttpError(404, 'Product not found.');
-          if (input.priceCents !== undefined) store.db.prepare('UPDATE products SET price_cents=? WHERE id=?').run(integer(input.priceCents, 'price', 1, 10000000), product.id);
-          if (input.stock !== undefined) {
-            const stock = integer(input.stock, 'stock quantity', 0, 1000000);
-            const change = store.db.prepare('UPDATE variants SET stock=? WHERE product_id=? AND color=? AND size=?').run(stock, product.id, text(input.color, 'color'), text(input.size, 'size'));
-            if (!change.changes) throw new HttpError(404, 'Product option not found.');
-          }
-          audit(adminId, 'update_product', product.id);
-        });
-        return send(res, 200, { product: store.products().find((product) => product.id === variantPath[1]) });
-      }
-      const adminOrder = /^\/api\/admin\/orders\/([a-f0-9-]{36})$/.exec(path);
-      if (adminOrder && req.method === 'PATCH') {
-        const input = await body(req);
-        const order = store.transaction(() => {
-          const row = store.db.prepare('SELECT * FROM orders WHERE id=?').get(adminOrder[1]);
-          if (!row) throw new HttpError(404, 'Order not found.');
-          if (input.status === 'cancelled' && row.status === 'confirmed' && row.payment_method === 'cod') store.releaseOrder(row);
-          else if (input.status === 'fulfilled' && row.status === 'confirmed' && (row.payment_status === 'paid' || (row.payment_method === 'cod' && input.collected === true))) store.db.prepare("UPDATE orders SET status='fulfilled',payment_status='paid',updated=? WHERE id=?").run(Date.now(), row.id);
-          else throw new HttpError(409, 'That order status change is unavailable. Paid refunds must be handled through Stripe.');
-          audit(adminId, `order_${input.status}`, row.id);
-          return store.publicOrder(store.db.prepare('SELECT * FROM orders WHERE id=?').get(row.id));
-        });
-        return send(res, 200, { order });
-      }
+      if (await management.handle(req,res,url,current)) return;
     }
     throw new HttpError(404, 'API endpoint not found.');
   }
@@ -252,6 +223,12 @@ export function createApp(config = configuration(), dependencies = {}) {
       if (!['GET','HEAD'].includes(req.method)) throw new HttpError(405, 'Method not allowed.');
       let path;
       try { path = decodeURIComponent(url.pathname).replace(/^\/+/, '') || 'index.html'; } catch { throw new HttpError(400, 'Invalid URL.'); }
+      if (path.startsWith('media/') && management.mediaName.test(path.slice(6))) {
+        let bytes;
+        try { bytes = await readFile(resolve(config.uploadsPath,path.slice(6))); } catch { throw new HttpError(404,'Photo not found.'); }
+        res.writeHead(200,{'Content-Type':mime[extname(path)],'Cache-Control':'public, max-age=86400'});
+        res.end(req.method === 'HEAD' ? undefined : bytes); return;
+      }
       if (!publicFiles.has(path) && !/^(assets|vendor)\/[a-zA-Z0-9_./-]+$/.test(path)) throw new HttpError(404, 'Page not found.');
       const filename = resolve(root, path);
       if (!filename.startsWith(root.endsWith(sep) ? root : root + sep) || path.split('/').some((part) => part.startsWith('.'))) throw new HttpError(404, 'Page not found.');

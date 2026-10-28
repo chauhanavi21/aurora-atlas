@@ -37,7 +37,7 @@ export function publicCustomer(row) {
 
 export function createAuthentication({ store, config, send, cookie, body, limit, dummyHash, dependencies = {} }) {
   const db = store.db;
-  const customer = (current) => current.customer_id ? db.prepare('SELECT * FROM customers WHERE id=?').get(current.customer_id) : null;
+  const customer = (current) => current.customer_id ? db.prepare('SELECT * FROM customers WHERE id=? AND disabled=0').get(current.customer_id) : null;
   function requireCustomer(current) {
     const row = customer(current);
     if (!row) throw new HttpError(401, 'Sign in to access your account.');
@@ -120,9 +120,9 @@ export function createAuthentication({ store, config, send, cookie, body, limit,
       checkFailures(address);
       const account = db.prepare('SELECT * FROM customers WHERE email=?').get(address);
       const matches = await passwordMatchesAsync(input.password, account?.password_hash || dummyHash);
-      if (!matches || !account) { recordFailure(address); throw new HttpError(401, 'Email or password is incorrect.'); }
+      if (!matches || !account || account.disabled) { recordFailure(address); throw new HttpError(401, 'Email or password is incorrect.'); }
       const rotated = store.transaction(() => {
-        if (db.prepare('SELECT password_hash FROM customers WHERE id=?').get(account.id)?.password_hash !== account.password_hash) throw new HttpError(401, 'Email or password is incorrect.');
+        if (db.prepare('SELECT password_hash FROM customers WHERE id=? AND disabled=0').get(account.id)?.password_hash !== account.password_hash) throw new HttpError(401, 'Email or password is incorrect.');
         db.prepare('DELETE FROM auth_failures WHERE key=?').run(failedKey(address));
         return rotateSession(current, { customerId: account.id, adminId: null, lifetime: (input.rememberMe ? 30 * 24 : 12) * 3600000, inTransaction: true });
       });
@@ -171,7 +171,7 @@ export function createAuthentication({ store, config, send, cookie, body, limit,
       const input = await body(req);
       const address = email(input.email);
       const account = db.prepare('SELECT * FROM customers WHERE email=?').get(address);
-      if (account) {
+      if (account && !account.disabled) {
         const secret = token(), expires = Date.now() + 30 * 60000;
         // Do not invalidate an existing link just because somebody requested another one.
         db.prepare('INSERT INTO password_resets VALUES(?,?,?)').run(hash(secret), account.id, expires);
@@ -184,7 +184,7 @@ export function createAuthentication({ store, config, send, cookie, body, limit,
       limit(req, 'reset-password', 10, 15 * 60000);
       const input = await body(req);
       if (typeof input.token !== 'string' || !/^[a-f0-9]{64}$/.test(input.token)) throw new HttpError(400, 'This recovery link is invalid or has expired. Request a new one.');
-      const reset = db.prepare('SELECT r.*,c.email FROM password_resets r JOIN customers c ON c.id=r.customer_id WHERE r.token_hash=? AND r.expires>?').get(hash(input.token), Date.now());
+      const reset = db.prepare('SELECT r.*,c.email FROM password_resets r JOIN customers c ON c.id=r.customer_id WHERE r.token_hash=? AND r.expires>? AND c.disabled=0').get(hash(input.token), Date.now());
       if (!reset) throw new HttpError(400, 'This recovery link is invalid or has expired. Request a new one.');
       const password = newPassword(input, reset.email), encoded = await passwordHashAsync(password);
       const rotated = store.transaction(() => {
