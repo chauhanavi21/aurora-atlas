@@ -3,7 +3,8 @@ import { readFile, stat } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { openStore, HttpError, passwordMatches, passwordHash, email, text, integer } from './store.mjs';
+import { openStore, HttpError, passwordMatchesAsync, passwordHash, email, text, integer } from './store.mjs';
+import { createAuthentication, publicCustomer } from './auth.mjs';
 
 export const root = fileURLToPath(new URL('../', import.meta.url));
 export function configuration(env = process.env) {
@@ -16,7 +17,9 @@ export function configuration(env = process.env) {
     shippingCents: number('SHIPPING_CENTS', 995, 100000), freeShippingCents: number('FREE_SHIPPING_CENTS', 15000, 10000000),
     taxRateBps: number('TAX_RATE_BPS', 0, 3000), allowCod: env.ALLOW_COD !== 'false',
     stripeSecret: env.STRIPE_SECRET_KEY || '', stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET || '',
-    stripeEnabled: Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET), supportEmail: env.SUPPORT_EMAIL || ''
+    stripeEnabled: Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET), supportEmail: env.SUPPORT_EMAIL || '',
+    localPasswordRecovery: env.NODE_ENV !== 'production' && env.AUTH_LOCAL_RECOVERY !== 'false',
+    authOutboxPath: resolve(root, '.data/mail-outbox')
   };
 }
 export function createApp(config = configuration(), dependencies = {}) {
@@ -25,7 +28,7 @@ export function createApp(config = configuration(), dependencies = {}) {
   const rateLimits = new Map();
   const dummyHash = passwordHash('unavailable-account');
   const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.png': 'image/png', '.json': 'application/json; charset=utf-8', '.woff2': 'font/woff2' };
-  const publicFiles = new Set(['index.html','shop.html','product.html','checkout.html','order.html','admin.html','catalog.js','api.js','main.js','scene.js','checkout.js','order.js','admin.js','style.css','pages.css','commerce.css','favicon.svg']);
+  const publicFiles = new Set(['index.html','shop.html','product.html','checkout.html','order.html','admin.html','login.html','signup.html','account.html','forgot-password.html','reset-password.html','auth.js','auth.css','auth-validation.js','catalog.js','api.js','main.js','scene.js','checkout.js','order.js','admin.js','style.css','pages.css','commerce.css','favicon.svg']);
   function send(res, status, value) {
     res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(JSON.stringify(value));
@@ -51,8 +54,8 @@ export function createApp(config = configuration(), dependencies = {}) {
     try { const value = JSON.parse(bytes.toString('utf8')); if (!value || Array.isArray(value) || typeof value !== 'object') throw new Error(); return value; }
     catch { throw new HttpError(400, 'Invalid JSON request.'); }
   }
-  function cookie(res, secret) {
-    res.setHeader('Set-Cookie', `aurora_session=${secret}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000${config.production ? '; Secure' : ''}`);
+  function cookie(res, secret, expires = Date.now() + 30 * 86400000) {
+    res.setHeader('Set-Cookie', `aurora_session=${secret}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.max(0, Math.floor((expires - Date.now()) / 1000))}${config.production ? '; Secure' : ''}`);
   }
   function session(req, res, create = false) {
     const secret = req.headers.cookie?.split(';').map((part) => part.trim()).find((part) => part.startsWith('aurora_session='))?.slice(15);
@@ -72,8 +75,9 @@ export function createApp(config = configuration(), dependencies = {}) {
   }
   function audit(adminId, action, target) { store.db.prepare('INSERT INTO audit_log(admin_id,action,target,created) VALUES(?,?,?,?)').run(adminId, action, target, Date.now()); }
   function settings() {
-    return { currency: 'usd', shippingCents: config.shippingCents, freeShippingCents: config.freeShippingCents, taxRateBps: config.taxRateBps, allowCod: config.allowCod, stripeEnabled: config.stripeEnabled, supportEmail: config.supportEmail, countries: ['US'] };
+    return { currency: 'usd', shippingCents: config.shippingCents, freeShippingCents: config.freeShippingCents, taxRateBps: config.taxRateBps, allowCod: config.allowCod, stripeEnabled: config.stripeEnabled, supportEmail: config.supportEmail, localPasswordRecovery: config.localPasswordRecovery, countries: ['US'] };
   }
+  const authentication = createAuthentication({ store, config, send, cookie, body, limit, dummyHash, dependencies });
   async function stripeCheckout(row) {
     if (row.status !== 'awaiting_payment') throw new HttpError(409, 'This checkout is no longer awaiting payment.');
     const data = new URLSearchParams({ mode: 'payment', success_url: `${config.publicUrl}/order.html?id=${row.id}`, cancel_url: `${config.publicUrl}/checkout.html?resume=${row.id}`, customer_email: JSON.parse(row.customer).email, client_reference_id: row.id, 'metadata[order_id]': row.id });
@@ -131,8 +135,9 @@ export function createApp(config = configuration(), dependencies = {}) {
     }
     if (path === '/api/session') limit(req, 'session', 90);
     const current = session(req, res, path === '/api/session' && req.method === 'GET');
-    if (path === '/api/session' && req.method === 'GET') return send(res, 200, { csrfToken: current.csrf, admin: Boolean(current.admin_id), settings: settings() });
+    if (path === '/api/session' && req.method === 'GET') return send(res, 200, { csrfToken: current.csrf, admin: Boolean(current.admin_id), user: publicCustomer(authentication.customer(current)), settings: settings() });
     if (!['GET','HEAD'].includes(req.method)) protect(req, current);
+    if ((path.startsWith('/api/auth/') || path.startsWith('/api/account/')) && await authentication.handle(req, res, path, current)) return;
     if (path === '/api/cart' && req.method === 'GET') return send(res, 200, store.cart(current.id));
     if (path === '/api/cart' && req.method === 'PUT') {
       limit(req, 'cart', 120);
@@ -155,8 +160,8 @@ export function createApp(config = configuration(), dependencies = {}) {
     }
     const orderPath = /^\/api\/orders\/([a-f0-9-]{36})(\/(cancel|pay))?$/.exec(path);
     if (orderPath) {
-      const row = store.db.prepare('SELECT * FROM orders WHERE id=? AND session_id=?').get(orderPath[1], current.id);
-      if (!row) throw new HttpError(404, 'Order not found in this browser session.');
+      const row = store.db.prepare('SELECT * FROM orders WHERE id=? AND ((customer_id IS NULL AND session_id=?) OR customer_id=?)').get(orderPath[1], current.id, current.customer_id || '');
+      if (!row) throw new HttpError(404, 'Order not found. Sign in to the account that placed this order, or open it in the original guest browser.');
       if (req.method === 'GET' && !orderPath[2]) return send(res, 200, { order: store.publicOrder(row) });
       if (req.method === 'POST' && orderPath[3] === 'pay') {
         limit(req, 'checkout', 12);
@@ -185,22 +190,18 @@ export function createApp(config = configuration(), dependencies = {}) {
       const input = await body(req);
       const account = store.db.prepare('SELECT * FROM admins WHERE email=?').get(email(input.email));
       const password = text(input.password, 'password', 1, 128);
-      if (!passwordMatches(password, account?.password_hash || dummyHash) || !account) throw new HttpError(401, 'Email or password is incorrect.');
-      const rotated = store.createSession(account.id);
-      store.transaction(() => {
-        store.db.prepare('UPDATE cart_items SET session_id=? WHERE session_id=?').run(rotated.session.id, current.id);
-        store.db.prepare('UPDATE orders SET session_id=? WHERE session_id=?').run(rotated.session.id, current.id);
-        store.db.prepare('DELETE FROM sessions WHERE id=?').run(current.id);
-      });
-      cookie(res, rotated.secret);
-      return send(res, 200, { csrfToken: rotated.session.csrf, admin: true });
+      if (!await passwordMatchesAsync(password, account?.password_hash || dummyHash) || !account) throw new HttpError(401, 'Email or password is incorrect.');
+      const rotated = authentication.rotateSession(current, { adminId: account.id });
+      cookie(res, rotated.secret, rotated.session.expires);
+      return send(res, 200, { csrfToken: rotated.session.csrf, admin: true, user: publicCustomer(authentication.customer(rotated.session)), cart: store.cart(rotated.session.id) });
     }
     if (path.startsWith('/api/admin/')) {
       const adminId = admin(current);
       if (path === '/api/admin/logout' && req.method === 'POST') {
         await body(req);
-        store.db.prepare('UPDATE sessions SET admin_id=NULL WHERE id=?').run(current.id);
-        return send(res, 200, { admin: false });
+        const rotated = authentication.rotateSession(current, { adminId: null });
+        cookie(res, rotated.secret, rotated.session.expires);
+        return send(res, 200, { admin: false, csrfToken: rotated.session.csrf });
       }
       if (path === '/api/admin/overview' && req.method === 'GET') {
         const orders = store.db.prepare('SELECT * FROM orders ORDER BY created DESC LIMIT 100').all().map((row) => store.publicOrder(row));
