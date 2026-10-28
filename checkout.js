@@ -25,6 +25,7 @@
   if (api.settings.stripeEnabled) methods.push(['stripe','Pay securely online','Continue to Stripe for card and supported wallet payments.']);
   $('#payment-options').innerHTML = methods.map(([value, label, note], index) => `<label class="payment-option"><input type="radio" name="paymentMethod" value="${value}" ${index === 0 ? 'checked' : ''} required><span><strong>${label}</strong><small>${note}</small></span></label>`).join('');
   if (!methods.length) { fail('Checkout is temporarily closed. Please check back shortly.'); $('#place-order').disabled = true; }
+  if (api.settings.checkoutEnabled === false) { fail('Checkout is temporarily closed. Please check back shortly.'); $('#place-order').disabled = true; }
   function render() {
     $('#checkout-layout').hidden = !cart.items.length;
     $('#checkout-empty').hidden = cart.items.length > 0;
