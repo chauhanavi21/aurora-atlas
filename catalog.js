@@ -414,6 +414,39 @@
         "Upper detail",
         "Fabric detail"
       ]
+    },
+    {
+      "id": "dune",
+      "name": "Dune Everyday Shirt",
+      "type": "An open invitation to slow down",
+      "price": 89,
+      "colors": [
+        "navy",
+        "obsidian"
+      ],
+      "description": "Button up, or leave it open over a tee. An easy long-sleeved shirt with a classic collar and an unhurried feel for everyday plans.",
+      "features": [
+        "Button front",
+        "Classic collar",
+        "Long sleeves"
+      ],
+      "details": "A button-front shirt with a pointed collar, long sleeves, and a softly relaxed body. Styled reference photos may include other garments; this listing is for the shirt only.",
+      "fit": "A relaxed shirt silhouette. Choose your usual size and use the chest measurement as a starting point.",
+      "category": "essentials",
+      "badge": "",
+      "sizes": [
+        "XS",
+        "S",
+        "M",
+        "L",
+        "XL"
+      ],
+      "care": "Follow the original garment care label. Wash with similar colors, reshape gently, and dry away from direct heat.",
+      "gallery": [
+        "Full view",
+        "Upper detail",
+        "Fabric detail"
+      ]
     }
   ];
   const catalog = Object.fromEntries(products.map((product) => [product.id, product]));
