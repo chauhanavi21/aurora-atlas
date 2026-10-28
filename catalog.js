@@ -315,6 +315,39 @@
         "Upper detail",
         "Fabric detail"
       ]
+    },
+    {
+      "id": "meridian",
+      "name": "Meridian Knit",
+      "type": "From first light to last plans",
+      "price": 98,
+      "colors": [
+        "navy",
+        "obsidian"
+      ],
+      "description": "A quiet classic for busy days. This crew-neck knit brings a clean outline and an easy layer to your everyday rotation.",
+      "features": [
+        "Crew neckline",
+        "Long sleeves",
+        "Ribbed cuffs and hem"
+      ],
+      "details": "A fine-looking knit with a round neckline and ribbed cuffs and hem. Wear over a tee or beneath an outer layer.",
+      "fit": "A regular knit fit. Choose your usual size and allow space for a light underlayer.",
+      "category": "essentials",
+      "badge": "",
+      "sizes": [
+        "XS",
+        "S",
+        "M",
+        "L",
+        "XL"
+      ],
+      "care": "Follow the original garment care label. Wash with similar colors, reshape gently, and dry away from direct heat.",
+      "gallery": [
+        "Full view",
+        "Upper detail",
+        "Fabric detail"
+      ]
     }
   ];
   const catalog = Object.fromEntries(products.map((product) => [product.id, product]));
