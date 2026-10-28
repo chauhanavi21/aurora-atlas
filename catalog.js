@@ -5,7 +5,9 @@
     obsidian: { name: 'Obsidian', hex: '#303330' },
     moss: { name: 'Moss', hex: '#696b46' },
     teal: { name: 'Deep teal', hex: '#345b66' },
-    chalk: { name: 'Chalk', hex: '#ded6bd' }
+    chalk: { name: 'Chalk', hex: '#ded6bd' },
+    navy: { name: 'Midnight navy', hex: '#252f43' },
+    mist: { name: 'Mist grey', hex: '#9a9b9d' }
   };
   const clothingSizes = ['XS', 'S', 'M', 'L', 'XL'];
   const products = [
