@@ -4,6 +4,7 @@ import { dirname } from 'node:path';
 import { randomBytes, randomUUID, createHash, scryptSync, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import seed from '../catalog.js';
+import { defaultSettings } from './settings.mjs';
 
 export class HttpError extends Error {
   constructor(status, message, details = {}) { super(message); this.status = status; this.details = details; }
@@ -80,18 +81,33 @@ export function openStore(filename, config) {
     for (const table of ['sessions', 'orders']) {
       if (!db.prepare(`PRAGMA table_info(${table})`).all().some((column) => column.name === 'customer_id')) db.exec(`ALTER TABLE ${table} ADD COLUMN customer_id TEXT REFERENCES customers(id)`);
     }
-    db.exec('CREATE INDEX IF NOT EXISTS orders_customer ON orders(customer_id,created DESC); CREATE UNIQUE INDEX IF NOT EXISTS orders_customer_request ON orders(customer_id,request_key) WHERE customer_id IS NOT NULL; PRAGMA user_version = 2;');
+    db.exec('CREATE INDEX IF NOT EXISTS orders_customer ON orders(customer_id,created DESC); CREATE UNIQUE INDEX IF NOT EXISTS orders_customer_request ON orders(customer_id,request_key) WHERE customer_id IS NOT NULL;');
+    const addColumn = (table, name, definition) => {
+      if (!db.prepare(`PRAGMA table_info(${table})`).all().some((column)=>column.name === name)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+    };
+    addColumn('variants','active','INTEGER NOT NULL DEFAULT 1');
+    addColumn('products','version','INTEGER NOT NULL DEFAULT 0');
+    addColumn('customers','disabled','INTEGER NOT NULL DEFAULT 0');
+    addColumn('orders','tracking','TEXT NOT NULL DEFAULT \'\'');
+    addColumn('orders','admin_notes','TEXT NOT NULL DEFAULT \'\'');
+    db.exec('CREATE TABLE IF NOT EXISTS store_settings (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 0); PRAGMA user_version=3;');
+    db.prepare('INSERT OR IGNORE INTO store_settings(id,data) VALUES(1,?)').run(JSON.stringify(defaultSettings(config)));
   });
   transaction(() => {
     for (const product of seed.products) {
-      db.prepare('INSERT OR IGNORE INTO products(id,data,price_cents) VALUES(?,?,?)').run(product.id, JSON.stringify(product), Math.round(product.price * 100));
-      for (const color of product.colors) for (const size of product.sizes) db.prepare('INSERT OR IGNORE INTO variants VALUES(?,?,?,?)').run(product.id, color, size, 20);
+      const inserted = db.prepare('INSERT OR IGNORE INTO products(id,data,price_cents) VALUES(?,?,?)').run(product.id, JSON.stringify(product), Math.round(product.price * 100));
+      if (!inserted.changes) continue; // Admin changes, including removed options, survive restarts.
+      for (const color of product.colors) for (const size of product.sizes) db.prepare('INSERT INTO variants(product_id,color,size,stock) VALUES(?,?,?,?)').run(product.id, color, size, 20);
     }
   });
-  function products() {
-    return db.prepare('SELECT * FROM products WHERE active=1 ORDER BY rowid').all().map((row) => ({
-      ...JSON.parse(row.data), price: row.price_cents / 100,
-      variants: db.prepare('SELECT color,size,stock FROM variants WHERE product_id=?').all(row.id)
+  function settings() {
+    const row = db.prepare('SELECT * FROM store_settings WHERE id=1').get();
+    return { ...defaultSettings(config), ...JSON.parse(row.data), version:row.version };
+  }
+  function products(includeArchived = false) {
+    return db.prepare(`SELECT * FROM products ${includeArchived ? '' : 'WHERE active=1'} ORDER BY rowid`).all().map((row) => ({
+      ...JSON.parse(row.data), price: row.price_cents / 100, active:Boolean(row.active), version:row.version,
+      variants: db.prepare('SELECT color,size,stock FROM variants WHERE product_id=? AND active=1').all(row.id)
     }));
   }
   function createSession(adminId = null, customerId = null, lifetime = 30 * 86400000) {
@@ -104,9 +120,10 @@ export function openStore(filename, config) {
     return secret ? db.prepare('SELECT * FROM sessions WHERE id=? AND expires>?').get(hash(secret), Date.now()) : undefined;
   }
   function totals(items) {
+    const current = settings();
     const subtotalCents = items.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0);
-    const shippingCents = !items.length || subtotalCents >= config.freeShippingCents ? 0 : config.shippingCents;
-    const taxCents = Math.round(subtotalCents * config.taxRateBps / 10000);
+    const shippingCents = !items.length || subtotalCents >= current.freeShippingCents ? 0 : current.shippingCents;
+    const taxCents = Math.round(subtotalCents * current.taxRateBps / 10000);
     return { subtotalCents, shippingCents, taxCents, totalCents: subtotalCents + shippingCents + taxCents, currency: 'usd' };
   }
   function cartOwner(sessionId, customerId = null) {
@@ -117,7 +134,7 @@ export function openStore(filename, config) {
   function cart(sessionId) {
     const owner = cartOwner(sessionId);
     const items = db.prepare(`SELECT c.product_id AS id,c.color,c.size,c.quantity,p.data,p.price_cents AS unitPriceCents,v.stock
-      FROM ${owner.table} c JOIN products p ON p.id=c.product_id JOIN variants v ON v.product_id=c.product_id AND v.color=c.color AND v.size=c.size WHERE c.${owner.key}=? AND p.active=1 ORDER BY c.rowid`).all(owner.id)
+      FROM ${owner.table} c JOIN products p ON p.id=c.product_id JOIN variants v ON v.product_id=c.product_id AND v.color=c.color AND v.size=c.size WHERE c.${owner.key}=? AND p.active=1 AND v.active=1 ORDER BY c.rowid`).all(owner.id)
       .map(({ data, ...item }) => ({ ...item, name: JSON.parse(data).name }));
     const version = db.prepare(`SELECT cart_version FROM ${owner.versionTable} WHERE id=?`).get(owner.id)?.cart_version || 0;
     return { items, version, ...totals(items) };
@@ -131,7 +148,7 @@ export function openStore(filename, config) {
       for (const item of items) {
         if (!item || typeof item !== 'object') throw new HttpError(400, 'Invalid bag item.');
         const quantity = integer(item.quantity, 'quantity', 1, 99);
-        const variant = db.prepare('SELECT v.stock FROM variants v JOIN products p ON p.id=v.product_id WHERE v.product_id=? AND v.color=? AND v.size=? AND p.active=1').get(text(item.id, 'product ID'), text(item.color, 'color'), text(item.size, 'size'));
+        const variant = db.prepare('SELECT v.stock FROM variants v JOIN products p ON p.id=v.product_id WHERE v.product_id=? AND v.color=? AND v.size=? AND p.active=1 AND v.active=1').get(text(item.id, 'product ID'), text(item.color, 'color'), text(item.size, 'size'));
         if (!variant) throw new HttpError(400, 'That product option is unavailable.');
         if (quantity > variant.stock) throw new HttpError(409, `Only ${variant.stock} of that option remain.`, { code: 'stock' });
         const key = `${item.id}/${item.color}/${item.size}`;
@@ -156,7 +173,7 @@ export function openStore(filename, config) {
   }
   function publicOrder(row, full = true) {
     if (!row) throw new HttpError(404, 'Order not found. Open the confirmation in the browser used to place the order.');
-    const result = { id: row.id, reference: row.reference, items: JSON.parse(row.items), subtotalCents: row.subtotal_cents, shippingCents: row.shipping_cents, taxCents: row.tax_cents, totalCents: row.total_cents, currency: 'usd', paymentMethod: row.payment_method, paymentStatus: row.payment_status, status: row.status, created: row.created };
+    const result = { id: row.id, reference: row.reference, items: JSON.parse(row.items), subtotalCents: row.subtotal_cents, shippingCents: row.shipping_cents, taxCents: row.tax_cents, totalCents: row.total_cents, currency: 'usd', paymentMethod: row.payment_method, paymentStatus: row.payment_status, status: row.status, created: row.created, tracking:row.tracking || '' };
     if (full) result.customer = JSON.parse(row.customer);
     return result;
   }
@@ -164,11 +181,13 @@ export function openStore(filename, config) {
     const requestKey = text(input.requestKey, 'checkout request', 16, 100);
     const details = customer(input.customer);
     const method = input.paymentMethod;
-    if (!['cod', 'stripe'].includes(method) || (method === 'cod' && !config.allowCod) || (method === 'stripe' && !config.stripeEnabled)) throw new HttpError(400, 'That payment method is not available.');
     return transaction(() => {
       const customerId = db.prepare('SELECT customer_id FROM sessions WHERE id=?').get(sessionId)?.customer_id || null;
       const previous = db.prepare('SELECT * FROM orders WHERE request_key=? AND ((customer_id IS NULL AND session_id=?) OR customer_id=?)').get(requestKey, sessionId, customerId || '');
       if (previous) return { order: publicOrder(previous), row: previous, reused: true };
+      const preferences = settings();
+      if (!preferences.checkoutEnabled) throw new HttpError(503, 'Checkout is temporarily closed. Please check back shortly.');
+      if (!['cod', 'stripe'].includes(method) || (method === 'cod' && !preferences.allowCod) || (method === 'stripe' && !config.stripeEnabled)) throw new HttpError(400, 'That payment method is not available.');
       const current = cart(sessionId);
       if (current.version !== input.cartVersion) throw new HttpError(409, 'Your bag has changed. Refresh checkout and review the total.');
       if (!current.items.length) throw new HttpError(400, 'Your bag is empty.');
@@ -230,5 +249,5 @@ export function openStore(filename, config) {
       db.prepare('INSERT INTO stripe_events VALUES(?,?)').run(event.id, Date.now());
     });
   }
-  return { db, products, createSession, getSession, cart, setCart, cartOwner, bumpCart, totals, placeOrder, publicOrder, releaseOrder, expireOrders, receiveStripe, transaction, colors: seed.colors, close: () => db.close() };
+  return { db, products, settings, createSession, getSession, cart, setCart, cartOwner, bumpCart, totals, placeOrder, publicOrder, releaseOrder, expireOrders, receiveStripe, transaction, colors: seed.colors, close: () => db.close() };
 }
