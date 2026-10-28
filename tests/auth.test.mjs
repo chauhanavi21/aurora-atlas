@@ -147,7 +147,7 @@ test('the version-one local database migrates without losing sessions or orders 
   legacy.prepare('INSERT INTO sessions(id,csrf,expires) VALUES(?,?,?)').run('legacy-session','legacy-csrf',Date.now()+86400000);
   legacy.prepare('INSERT INTO orders VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run('legacy-order','AA-LEGACY','legacy-session','legacy-request',JSON.stringify(delivery),'[]',3200,995,0,4195,'cod','due_on_delivery','confirmed',null,Date.now(),Date.now(),null);legacy.close();
   const app=await fixture(t,{databasePath}),c=app.client();await c.init();const registered=await c.register();await c.cart([option(2)]);
-  assert.equal(app.store.db.prepare('PRAGMA user_version').get().user_version,2);assert.equal(app.store.db.prepare("SELECT reference FROM orders WHERE id='legacy-order'").get().reference,'AA-LEGACY');
+  assert.equal(app.store.db.prepare('PRAGMA user_version').get().user_version,3);assert.equal(app.store.db.prepare("SELECT reference FROM orders WHERE id='legacy-order'").get().reference,'AA-LEGACY');
   const closed=once(app.server,'close');app.server.close();app.server.closeAllConnections();await closed;
   const reopened=await fixture(t,{databasePath}),restored=reopened.client({cookie:registered.cookie,csrf:registered.csrf});assert.equal((await restored.request('/api/auth/me')).data.user.email,'ava@example.com');assert.equal((await restored.request('/api/cart')).data.items[0].quantity,2);
   t.after(async()=>{for(const file of ['local.sqlite','local.sqlite-wal','local.sqlite-shm'])await rm(join(directory,file),{force:true});await rmdir(directory);});

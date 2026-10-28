@@ -39,7 +39,7 @@ async function fixture(t, overrides = {}, dependencies = {}) {
 test('public catalog and static files are served without exposing source, secrets, or the database', async (t) => {
   const app = await fixture(t); const c = app.client();
   const catalog = await c.request('/api/products');
-  assert.equal(catalog.status,200); assert.equal(catalog.data.products.length,20);
+  assert.equal(catalog.status,200); assert.equal(catalog.data.products.length,70);
   assert(catalog.data.products.every((p) => p.variants.length && p.variants.every((v) => Number.isInteger(v.stock))));
   assert.equal((await c.request('/api/products/core')).data.product.price,32);
   assert.equal((await c.request('/api/products/missing')).status,404);

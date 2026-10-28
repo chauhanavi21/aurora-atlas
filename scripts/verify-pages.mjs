@@ -1,8 +1,9 @@
 // DOM and local-asset checks. This complements, but does not replace, Chrome layout checks.
 // Usage: node scripts/verify-pages.mjs [path/to/happy-dom/lib/index.js]
 import assert from 'node:assert/strict';
-import { readFile, access } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { readFile, access, mkdtemp, readdir, rm, rmdir } from 'node:fs/promises';
+import { resolve, join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -15,7 +16,9 @@ const mainCode = await readFile('main.js', 'utf8');
 const apiCode = await readFile('api.js', 'utf8');
 const state = new Map();
 const recoveryMessages = [];
-const app = createApp({ ...configuration({}), databasePath: ':memory:' }, { deliverReset: async (message) => { recoveryMessages.push(message); } });
+let requestClock = Date.now();
+const uploadsPath = await mkdtemp(join(tmpdir(),'aurora-ui-photos-'));
+const app = createApp({ ...configuration({}), databasePath: ':memory:', uploadsPath }, { now:()=>requestClock, deliverReset: async (message) => { recoveryMessages.push(message); } });
 app.store.db.prepare('INSERT INTO admins VALUES(?,?,?)').run('test-owner', 'owner@example.com', passwordHash('Test-owner-password-42'));
 app.server.listen(0, '127.0.0.1'); await once(app.server, 'listening');
 const origin = `http://127.0.0.1:${app.server.address().port}`;
@@ -27,6 +30,7 @@ const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 
 async function load(path) {
+  requestClock += 2000; // Simulate normal browsing time while exercising all 70 items without weakening production limits.
   if (window) {
     for (let i = 0; i < window.localStorage.length; i++) {
       const key = window.localStorage.key(i); state.set(key, window.localStorage.getItem(key));
@@ -94,7 +98,8 @@ try {
   assert.equal($('script[src="scene.js"]') !== null, true);
   assert.equal($('#product-dialog'), null, 'Product links should open pages, not a modal');
   const { products, colors } = window.AuroraCatalog;
-  const totalPhotos = products.reduce((sum, product) => sum + product.colors.length, 0);
+  const totalPhotos = products.reduce((sum,product)=>sum+product.colors.reduce((count,color)=>count+(product.images?.[color]?.length || 1),0),0);
+  assert.equal(products.length,70,'The collection should contain the original 20 and 50 additional samples');
   assert.equal(new Set(products.map((product) => product.id)).size, products.length, 'Product IDs must be unique');
   assert.equal($('[data-category-count="all"]').textContent, String(products.length).padStart(2, '0'));
   assert.match($('.collection-count').textContent, new RegExp(`4 of ${products.length}`));
@@ -104,10 +109,10 @@ try {
   assert.equal($$('#product-grid .product-card').length, products.filter((product) => product.category === 'bottoms').length);
   assert.equal($('#view-all').getAttribute('href'), 'shop.html?category=bottoms');
   await click('[data-filter="all"]');
-  const sources = JSON.parse(await readFile('assets/photos/sources.json', 'utf8'));
+  const sources = [...JSON.parse(await readFile('assets/photos/sources.json','utf8')),...JSON.parse(await readFile('assets/photos/sample-sources.json','utf8'))];
   assert.equal(sources.length, totalPhotos);
   assert.equal(new Set(sources.map((source) => source.file)).size, totalPhotos);
-  for (const file of ['style.css', 'pages.css', 'commerce.css', 'auth.css']) {
+  for (const file of ['style.css', 'pages.css', 'commerce.css', 'auth.css', 'admin.css']) {
     const stylesheet = new window.CSSStyleSheet();
     stylesheet.replaceSync(await readFile(file, 'utf8'));
     assert(stylesheet.cssRules.length > 20, 'Stylesheet could not be parsed: ' + file);
@@ -115,14 +120,17 @@ try {
   for (const product of products) {
     for (const color of product.colors) {
       assert(colors[color], 'Every product color must have a label and swatch');
-      const filename = product.id + '-' + color + '-front.jpg';
-      assert(sources.some((source) => source.file === filename && source.url.startsWith('https://') && source.credit));
-      const bytes = await readFile('assets/photos/' + filename);
-      const size = jpegSize(bytes);
-      assert(size.width >= 1200 && size.height >= 1600, 'Product photo is too small');
+      const paths=product.images?.[color] || ['assets/photos/'+product.id+'-'+color+'-front.jpg'];
+      for(const path of paths){
+        const filename=path.split('/').at(-1);
+        assert(sources.some((source)=>source.file===filename&&source.url.startsWith('https://')&&source.credit));
+        const bytes=await readFile(path);
+        if(path.endsWith('.jpg')){const size=jpegSize(bytes);assert(size.width>=1200&&size.height>=1600,'Product photo is too small');}
+        else {assert.equal(bytes.toString('ascii',0,4),'RIFF');assert.equal(bytes.toString('ascii',8,12),'WEBP');assert(bytes.length>1000);}
+      }
     }
   }
-  console.log(`Homepage links, catalog integrity, source credits, and all ${totalPhotos} full-resolution photographs passed.`);
+  console.log(`Homepage links, catalog integrity, source credits, and all ${totalPhotos} locally stored photographs passed.`);
 
   await load('shop.html?category=outerwear');
   assert.equal($$('#product-grid .product-card').length, products.filter((product) => product.category === 'outerwear').length);
@@ -216,17 +224,19 @@ try {
       assert.equal($$('.related-products .product-card').length, 3);
       assert.equal($(`.related-products [data-product="${product.id}"]`), null);
       assert.equal($('.size-note').textContent, product.fit);
-      assert.match($('#detail-image').src, new RegExp(product.id + '-' + color + '-front.jpg'));
+      assert.equal($('#detail-image').getAttribute('src'),window.AuroraCatalog.photo(product,color));
     }
     const previousCount = Number($('.bag-count').textContent);
-    const previousTotal = Number($('#bag-subtotal').textContent.replace(/[^0-9]/g, ''));
-    if (product.sizes.length > 1) await click('[data-size="M"]');
+    const previousTotal = Number($('#bag-subtotal').textContent.replace(/[^0-9.]/g, ''));
+    if (product.sizes.length > 1) await click(`[data-size="${product.sizes.includes('M') ? 'M' : product.sizes[0]}"]`);
     await submit();
-    assert.equal($('#bag-dialog').open, true);
+    assert.equal($('#bag-dialog').open, true,product.id+': '+$('#toast').textContent);
     assert.equal(Number($('.bag-count').textContent), previousCount + 1);
-    assert.equal(Number($('#bag-subtotal').textContent.replace(/[^0-9]/g, '')), previousTotal + product.price);
+    assert.equal(Math.round(Number($('#bag-subtotal').textContent.replace(/[^0-9.]/g,''))*100),Math.round(previousTotal*100)+Math.round(product.price*100));
     assert($(`#bag-items a[href*="id=${product.id}"]`));
-    assert($('.product-purchase > .eyebrow').textContent.endsWith(String(products.indexOf(product) + 1).padStart(3, '0')));  }
+    assert($('.product-purchase > .eyebrow').textContent.endsWith(String(products.indexOf(product) + 1).padStart(3, '0')));
+    await click(`[data-remove="${$$('#bag-items .bag-item').length-1}"]`); // Check each product without exceeding the real bag's 40-line limit.
+  }
   await load('shop.html?category=bottoms&q=trousers&sort=price-low');
   assert.equal($('#product-search').value, 'trousers');
   assert.equal($('#product-sort').value, 'price-low');
@@ -297,6 +307,42 @@ try {
   $('[data-product-id="core"]').dispatchEvent(new window.Event('submit', { bubbles:true, cancelable:true }));
   await idle();
   assert.match($('#admin-status').textContent, /saved/, $('#admin-error').textContent);
+  async function submitAdmin(selector){$(selector).dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));await idle();}
+  await click('[data-admin-tab="products"]');
+  assert.equal($$('.admin-product-row').length,70);
+  await click('[data-edit-product="core"]');assert.equal($('#product-editor').open,true);
+  input('#product-editor-form [name=name]','Core & <Layer> Tee');
+  $('#product-editor-form [name=price]').step='any';
+  await submitAdmin('#product-editor-form');assert.equal($('#product-editor').open,false,$('#product-editor-error').textContent);
+  assert.match($('#admin-product-list').textContent,/Core & <Layer> Tee/);assert.equal($('#admin-product-list layer'),null,'Product names must be escaped in HTML');
+  await click('#new-product');
+  for(const [key,value] of Object.entries({name:'Sample Weekend Bag',id:'weekend-test',type:'An everyday carry',category:'accessories',price:'49',description:'A sample carry bag for weekend plans.',details:'A compact sample bag with a zip closure.',fit:'One size.',care:'Spot clean gently.',features:'Zip closure\nEveryday carry',sizes:'ONE SIZE',initialStock:'3'}))input(`#product-editor-form [name="${key}"]`,value,key==='sizes'?'change':'input');
+  const photoInput=$('[data-upload-color=pictured]');
+  Object.defineProperty(photoInput,'files',{configurable:true,value:[new window.File([await readFile('assets/photos/transit-moss-front.jpg')],'bag.jpg',{type:'image/jpeg'})]});
+  photoInput.dispatchEvent(new window.Event('change',{bubbles:true}));
+  for(let attempt=0;attempt<200&&$('#save-product').disabled;attempt++)await delay(10);
+  await idle();assert.match($('[data-photo-paths=pictured]').value,/^media\//,$('#product-editor-error').textContent);
+  $('#product-editor-form [name=active]').checked=true;
+  await submitAdmin('#product-editor-form');assert.equal($('#product-editor').open,false,$('#product-editor-error').textContent);
+  assert.equal($$('.admin-product-row').length,71);assert.equal((await window.AuroraAPI.request('/api/products/weekend-test')).product.variants[0].stock,3);
+  await click('[data-publish-product="weekend-test"]');assert.equal(app.store.products().some((p)=>p.id==='weekend-test'),false);
+  await click('[data-admin-tab=settings]');input('#store-settings-form [name=heroTitle]','Clothes & <great> days.');input('#store-settings-form [name=shipping]','4.25');input('#store-settings-form [name=tax]','7.5');input('#store-settings-form [name=supportEmail]','help@example.com');
+  for(const element of $$('#store-settings-form input[type=number]'))element.step='any';
+  for(const option of $('#store-settings-form [name=featuredProductIds]').options)option.selected=['core','weekend-test'].includes(option.value);
+  await submitAdmin('#store-settings-form');assert.match($('#admin-status').textContent,/settings saved/,$('#admin-error').textContent);
+  const customerId='b2dc2f90-755c-4abc-a945-afc1160c43b9';
+  app.store.db.prepare('INSERT INTO customers(id,name,email,password_hash,created,updated) VALUES(?,?,?,?,?,?)').run(customerId,'Test Customer','test.customer@example.com',passwordHash('A private customer phrase!42'),Date.now(),Date.now());
+  await click('#admin-refresh');await click('[data-admin-tab=customers]');window.confirm=()=>true;
+  input(`[data-customer-form="${customerId}"] [name=name]`,'Customer Updated');await submitAdmin(`[data-customer-form="${customerId}"]`);
+  await click(`[data-customer="${customerId}"][data-disabled=true]`);assert.match($('#customers-list').textContent,/Disabled/);
+  await click(`[data-customer="${customerId}"][data-disabled=false]`);assert.match($('#customers-list').textContent,/Active/);
+  app.store.db.prepare('DELETE FROM customers WHERE id=?').run(customerId);
+  await click('[data-admin-tab=orders]');input('.order-management-form [name=tracking]','Local carrier TRACK-42');input('.order-management-form [name=adminNotes]','An internal sample note');await submitAdmin('.order-management-form');
+  await click('[data-order][data-status=shipped]');assert.match($('#orders-list').textContent,/shipped/);
+  await load(placedUrl);await window.eval(await readFile('order.js','utf8'));assert.match($('#order-status').textContent,/shipped.*TRACK-42/);assert(!$('#order-content').textContent.includes('An internal sample note'));
+  await load('index.html');assert.equal($('#hero-heading').textContent,'Clothes & <great> days.');assert.equal($('#hero-heading great'),null);assert.equal($$('#product-grid .product-card').length,1,'Archived featured products must stay hidden');assert.equal($('#product-grid h3').textContent,'Core & <Layer> Tee');
+  await click('[data-info=contact]');assert.match($('#info-body').textContent,/help@example.com/);
+  console.log('Admin product creation, real photo uploads, safe product editing, publishing, settings, customer controls, shipment tracking, and private notes passed.');
   await load('product.html?id=core&color=obsidian');
   assert.match($('#detail-price').textContent, /39\.99/);
   await click('[data-size="M"]');
@@ -341,4 +387,6 @@ try {
 } finally {
   await window?.happyDOM.abort();
   const closed = once(app.server, 'close'); app.server.close(); app.server.closeAllConnections(); await closed;
+  for(const filename of await readdir(uploadsPath))await rm(join(uploadsPath,filename));
+  await rmdir(uploadsPath);
 }
