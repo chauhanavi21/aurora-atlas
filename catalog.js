@@ -83,6 +83,39 @@
         "Upper detail",
         "Fabric detail"
       ]
+    },
+    {
+      "id": "motion",
+      "name": "Motion Tee",
+      "type": "An easy layer for changing plans",
+      "price": 38,
+      "colors": [
+        "navy",
+        "obsidian"
+      ],
+      "description": "For early starts and open afternoons. A pared-back crew tee with a clean neckline and an uncomplicated shape that works with denim, trousers, or a light jacket.",
+      "features": [
+        "Clean crew neckline",
+        "Easy short sleeves",
+        "Minimal finish"
+      ],
+      "details": "A simple short-sleeved crew tee with a neat neckline and a straight body. No extra details to get in the way.",
+      "fit": "A regular silhouette with a neat shoulder. Use the chest measurement in the size guide.",
+      "category": "essentials",
+      "badge": "",
+      "sizes": [
+        "XS",
+        "S",
+        "M",
+        "L",
+        "XL"
+      ],
+      "care": "Follow the original garment care label. Wash with similar colors, reshape gently, and dry away from direct heat.",
+      "gallery": [
+        "Full view",
+        "Upper detail",
+        "Fabric detail"
+      ]
     }
   ];
   const catalog = Object.fromEntries(products.map((product) => [product.id, product]));
