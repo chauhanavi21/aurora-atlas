@@ -1,7 +1,7 @@
 /* Same-origin API client. Session cookies stay HttpOnly; prices come from the server. */
 (() => {
   'use strict';
-  const api = { available: false, csrfToken: '', cart: { items: [], version: 0 }, settings: {} };
+  const api = { available: false, csrfToken: '', user: null, cart: { items: [], version: 0 }, settings: {} };
   api.request = async (path, options = {}) => {
     const method = options.method || 'GET';
     const response = await fetch(path, {
@@ -18,6 +18,18 @@
     return data;
   };
   function broadcast() { window.dispatchEvent(new CustomEvent('aurora:cart', { detail: api.cart })); }
+  api.applyAuth = (data) => {
+    api.csrfToken = data.csrfToken; api.user = data.user || null; api.admin = Boolean(data.admin);
+    if (data.cart) api.cart = data.cart;
+    try { localStorage.removeItem('aurora-atlas-bag-v1'); localStorage.setItem('aurora-atlas-bag-imported-v1', '1'); } catch {}
+    broadcast(); window.dispatchEvent(new CustomEvent('aurora:auth', { detail: api.user }));
+  };
+  api.refreshSession = async () => {
+    const data = await api.request('/api/session');
+    api.csrfToken = data.csrfToken; api.user = data.user || null; api.admin = data.admin; api.settings = data.settings;
+    window.dispatchEvent(new CustomEvent('aurora:auth', { detail: api.user }));
+    return data;
+  };
   api.refreshCart = async () => { api.cart = await api.request('/api/cart'); broadcast(); return api.cart; };
   api.setCart = async (items) => {
     api.cart = await api.request('/api/cart', { method: 'PUT', body: { items: items.map(({ id, color, size, quantity }) => ({ id, color, size, quantity })), version: api.cart.version } });
@@ -26,14 +38,14 @@
   api.ready = (async () => {
     try {
       const [session, data] = await Promise.all([api.request('/api/session'), api.request('/api/products')]);
-      api.csrfToken = session.csrfToken; api.settings = session.settings; api.admin = session.admin;
+      api.csrfToken = session.csrfToken; api.settings = session.settings; api.admin = session.admin; api.user = session.user || null;
       const previous = window.AuroraCatalog;
       window.AuroraCatalog = { ...previous, ...data, catalog: Object.fromEntries(data.products.map((product) => [product.id, product])) };
       api.cart = await api.request('/api/cart');
       api.available = true;
       // Import a pre-backend bag once. Every imported variant is checked against live stock.
       try {
-        if (!localStorage.getItem('aurora-atlas-bag-imported-v1')) {
+        if (!api.user && !localStorage.getItem('aurora-atlas-bag-imported-v1')) {
           const old = JSON.parse(localStorage.getItem('aurora-atlas-bag-v1') || '[]');
           if (!api.cart.items.length && Array.isArray(old) && old.length && old.length <= 40) {
             const items = old.filter((item) => item && Number.isInteger(item.quantity) && item.quantity > 0 && window.AuroraCatalog.catalog[item.id]?.variants.some((variant) => variant.color === item.color && variant.size === item.size && variant.stock >= item.quantity));
