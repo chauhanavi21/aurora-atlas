@@ -6,6 +6,11 @@
   const money = (cents) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
   const fail = (message) => { $('#checkout-error').textContent = message; $('#checkout-error').hidden = false; };
   if (!api.available) { fail('The store is unavailable. Please refresh and try again shortly.'); return; }
+  if (api.user) {
+    $('#checkout-account').textContent = `Signed in as ${api.user.email}. This order will appear in your account.`;
+    $('#checkout-form [name=name]').value = api.user.name;
+    $('#checkout-form [name=email]').value = api.user.email;
+  } else $('#checkout-account').innerHTML = '<a href="login.html?next=checkout.html">Sign in</a> or <a href="signup.html?next=checkout.html">create an account</a> to keep your orders together. You can also continue as a guest.';
   const states = { AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',DC:'District of Columbia',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming' };
   for (const [value, label] of Object.entries(states)) {
     const option = document.createElement('option'); option.value = value; option.textContent = label;

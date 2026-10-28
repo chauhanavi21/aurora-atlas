@@ -9,7 +9,7 @@
   async function load() {
     try {
       if (!api.available) throw new Error('The store is unavailable. Please try again shortly.');
-      if (!/^[a-f0-9-]{36}$/.test(id || '')) throw new Error('Open your order using the link from checkout.');
+      if (!/^[a-f0-9-]{36}$/.test(id || '')) throw new Error('Open your order from checkout or your account history.');
       const { order } = await api.request('/api/orders/' + id);
       $('#order-content').hidden = false;
       const paid = order.paymentStatus === 'paid', confirmed = ['confirmed','fulfilled'].includes(order.status);
