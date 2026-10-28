@@ -1,11 +1,15 @@
 // Browser checks with the installed Chrome and Node.js; no npm dependencies.
-// Start the static server on port 4173 before running: node scripts/verify.mjs
+// Start npm start first. Set PREVIEW_URL to override http://localhost:3000.
 import { spawn } from 'node:child_process';
 import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import assert from 'node:assert/strict';
 
+const baseUrl = process.env.PREVIEW_URL || 'http://localhost:3000/';
+const health = await fetch(new URL('/api/health', baseUrl));
+assert.equal(health.status, 200, 'Start the Aurora Atlas backend before browser verification');
+await health.arrayBuffer();
 const profile = await mkdtemp(join(tmpdir(), 'aurora-atlas-browser-'));
 const chrome = spawn('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', [
   '--headless=new', '--disable-gpu', '--enable-unsafe-swiftshader',
@@ -69,7 +73,7 @@ try {
   await command('Runtime.enable');
   await command('Page.enable');
   const navigate = async (path, condition) => {
-    const url = new URL(path || '/', 'http://127.0.0.1:4173/').href;
+    const url = new URL(path || '/', baseUrl).href;
     await command('Page.navigate', { url });
     await waitFor('location.href === ' + JSON.stringify(url) + ' && document.readyState === "complete" && (' + condition + ')');
   };
@@ -123,9 +127,9 @@ try {
   assert.equal(await evaluate('document.querySelector("#bag-subtotal").textContent'), '$245');
   await screenshot('bag.png');
   await click('#checkout-trigger');
-  assert.match(await evaluate('document.querySelector("#info-body").textContent'), /payments are not connected/);
-  await click('#info-dialog [data-close]');
-  await click('#bag-dialog [data-close]');
+  await waitFor('document.body.dataset.page === "checkout" && !document.querySelector("#checkout-layout").hidden');
+  assert.equal(await evaluate('document.querySelectorAll("#checkout-items .summary-item").length'), 1);
+  await navigate('product.html?id=boreal&color=obsidian', 'document.querySelector("#detail-title")?.textContent === "Boreal Puffer"');
   await evaluate('window.__verificationBeforeReload = true');
   await command('Page.reload');
   await waitFor('!window.__verificationBeforeReload && document.querySelector(".bag-count")?.textContent === "1" && document.querySelector("#detail-title")?.textContent === "Boreal Puffer"');
@@ -207,8 +211,8 @@ try {
   await evaluate('window.scrollTo({top:0,behavior:"instant"})');
   await checkOverflow('Homepage mobile');
   await screenshot('mobile.png');
-  await evaluate('document.querySelector("#newsletter-email").value="explorer@example.com"; document.querySelector("#newsletter-form").requestSubmit()');
-  assert.match(await evaluate('document.querySelector("#newsletter-message").textContent'), /saved in this browser/);
+  await evaluate('document.querySelector("#newsletter-email").value="explorer@example.com"; document.querySelector("#newsletter-consent").checked=true; document.querySelector("#newsletter-form").requestSubmit()');
+  await waitFor('document.querySelector("#newsletter-message").textContent.includes("on the list")');
   console.log('Mobile shop, real navigation, product photos, variant selection, bag, and newsletter passed.');
 
   for (const width of [768, 900]) {
