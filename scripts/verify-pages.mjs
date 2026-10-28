@@ -4,12 +4,24 @@ import assert from 'node:assert/strict';
 import { readFile, access } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { once } from 'node:events';
+import { setTimeout as delay } from 'node:timers/promises';
+import { createApp, configuration } from '../server/app.mjs';
+import { passwordHash } from '../server/store.mjs';
 
 const { Window } = await import(process.argv[2] ? pathToFileURL(resolve(process.argv[2])).href : 'happy-dom');
 const catalogCode = await readFile('catalog.js', 'utf8');
 const mainCode = await readFile('main.js', 'utf8');
+const apiCode = await readFile('api.js', 'utf8');
 const state = new Map();
+const app = createApp({ ...configuration({}), databasePath: ':memory:' });
+app.store.db.prepare('INSERT INTO admins VALUES(?,?,?)').run('test-owner', 'owner@example.com', passwordHash('Test-owner-password-42'));
+app.server.listen(0, '127.0.0.1'); await once(app.server, 'listening');
+const origin = `http://127.0.0.1:${app.server.address().port}`;
+app.config.publicUrl = origin;
+let cookie = '', pending = 0;
 let window, document;
+const runtimeErrors = [];
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 
@@ -20,23 +32,45 @@ async function load(path) {
     }
     await window.happyDOM.abort();
   }
-  const url = new URL(path, 'http://127.0.0.1:4173/');
+  const url = new URL(path, origin + '/');
   // Only our known local scripts are evaluated; external scripts and CSS never load.
   window = new Window({ url: url.href, settings: { enableJavaScriptEvaluation: true, suppressInsecureJavaScriptEnvironmentWarning: true, disableJavaScriptFileLoading: true, disableCSSFileLoading: true, disableComputedStyleRendering: true } });
   document = window.document;
+  window.addEventListener('error', (event) => { runtimeErrors.push(event.error?.stack || event.message); event.preventDefault(); });
   for (const [key, value] of state) window.localStorage.setItem(key, value);
   document.write(await readFile(url.pathname.slice(1) || 'index.html', 'utf8'));
+  window.fetch = async (path, options = {}) => {
+    pending++;
+    try {
+      const response = await fetch(new URL(path, origin), { ...options, signal: AbortSignal.timeout(10000), headers: { ...options.headers, Cookie: cookie, Origin: origin } });
+      const next = response.headers.get('set-cookie'); if (next) cookie = next.split(';')[0];
+      // Consume the body before declaring the request settled.
+      const bytes = await response.arrayBuffer();
+      return new Response(bytes, { status: response.status, headers: response.headers });
+    } finally { pending--; }
+  };
   window.eval(catalogCode);
-  window.eval(mainCode);
+  window.eval(apiCode);
+  await window.AuroraAPI.ready;
+  await window.eval(mainCode);
 }
-function click(selector) {
+async function idle() {
+  await delay(1);
+  for (let i = 0; i < 400 && pending; i++) await delay(5);
+  assert.equal(pending, 0, 'API requests did not settle');
+  await delay(1);
+  assert.deepEqual(runtimeErrors, [], 'Unexpected storefront error');
+}
+async function click(selector) {
   assert($(selector), 'Missing element: ' + selector); $(selector).click();
+  await idle();
 }
 function input(selector, value, event = 'input') {
   $(selector).value = value; $(selector).dispatchEvent(new window.Event(event, { bubbles: true }));
 }
-function submit() {
+async function submit() {
   $('#product-form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+  await idle();
 }
 function jpegSize(bytes) {
   assert.equal(bytes.readUInt16BE(0), 0xffd8, 'Not a JPEG');
@@ -65,14 +99,14 @@ try {
   assert.match($('.collection-count').textContent, new RegExp(`4 of ${products.length}`));
   assert($('#product-grid [data-product="cloud"]'), 'The homepage should introduce a new layer');
   assert($('#product-grid [data-product="horizon"]'), 'The homepage should introduce trousers');
-  click('[data-filter="bottoms"]');
+  await click('[data-filter="bottoms"]');
   assert.equal($$('#product-grid .product-card').length, products.filter((product) => product.category === 'bottoms').length);
   assert.equal($('#view-all').getAttribute('href'), 'shop.html?category=bottoms');
-  click('[data-filter="all"]');
+  await click('[data-filter="all"]');
   const sources = JSON.parse(await readFile('assets/photos/sources.json', 'utf8'));
   assert.equal(sources.length, totalPhotos);
   assert.equal(new Set(sources.map((source) => source.file)).size, totalPhotos);
-  for (const file of ['style.css', 'pages.css']) {
+  for (const file of ['style.css', 'pages.css', 'commerce.css']) {
     const stylesheet = new window.CSSStyleSheet();
     stylesheet.replaceSync(await readFile(file, 'utf8'));
     assert(stylesheet.cssRules.length > 20, 'Stylesheet could not be parsed: ' + file);
@@ -92,7 +126,7 @@ try {
   await load('shop.html?category=outerwear');
   assert.equal($$('#product-grid .product-card').length, products.filter((product) => product.category === 'outerwear').length);
   assert.equal($('#results-title').textContent, 'Outerwear');
-  click('[data-filter="all"]');
+  await click('[data-filter="all"]');
   input('#product-sort', 'price-low', 'change');
   assert.equal($('#product-grid h3').textContent, [...products].sort((a, b) => a.price - b.price)[0].name);
   input('#product-sort', 'price-high', 'change');
@@ -103,21 +137,21 @@ try {
   input('#product-search', '<script>unknown</script>');
   assert.equal($('#no-results').hidden, false);
   assert.equal($('#product-grid script'), null);
-  click('#reset-collection');
+  await click('#reset-collection');
   assert.equal($$('#product-grid .product-card').length, products.length);
   for (const category of new Set(products.map((product) => product.category))) {
-    click(`[data-filter="${category}"]`);
+    await click(`[data-filter="${category}"]`);
     const expected = products.filter((product) => product.category === category).length;
     assert.equal($$('#product-grid .product-card').length, expected);
     assert.equal($(`[data-category-count="${category}"]`).textContent, String(expected).padStart(2, '0'));
     assert.equal(new URLSearchParams(window.location.search).get('category'), category);
   }
-  click('[data-filter="all"]');
+  await click('[data-filter="all"]');
   input('#product-sort', 'name', 'change');
   assert.deepEqual($$('#product-grid h3').map((element) => element.textContent), Array.from(products, (product) => product.name).sort((a, b) => a.localeCompare(b)));
-  click('.mobile-menu-trigger');
+  await click('.mobile-menu-trigger');
   assert.equal($('.mobile-nav').hidden, false);
-  click('.mobile-menu-trigger');
+  await click('.mobile-menu-trigger');
   assert.equal($('.mobile-nav').hidden, true);
   for (const link of $$('a[href]')) {
     const url = new URL(link.getAttribute('href'), window.location.href);
@@ -130,45 +164,45 @@ try {
   assert.equal($('#detail-color-name').textContent, 'Deep teal');
   assert.match($('#detail-image').src, /boreal-teal-front.jpg/);
   assert.equal($('script[src="vendor/three.min.js"]'), null);
-  click('[data-gallery-index="1"]');
+  await click('[data-gallery-index="1"]');
   assert.equal($('#detail-image').dataset.view, '1');
-  click('#gallery-zoom');
+  await click('#gallery-zoom');
   assert.equal($('#image-dialog').open, true);
-  click('#image-dialog [data-gallery-step="1"]');
+  await click('#image-dialog [data-gallery-step="1"]');
   assert.equal($('#detail-image').dataset.view, '2');
-  click('#image-dialog [data-close]');
-  click('[data-detail-color="obsidian"]');
+  await click('#image-dialog [data-close]');
+  await click('[data-detail-color="obsidian"]');
   assert.equal($('#detail-image').dataset.view, '0');
   assert.match($('#detail-image').src, /boreal-obsidian-front.jpg/);
   assert.equal(new URLSearchParams(window.location.search).get('color'), 'obsidian');
-  submit();
+  await submit();
   assert.equal($('#size-error').hidden, false);
   assert.equal($('#bag-dialog').open, false);
-  click('#size-guide-trigger');
+  await click('#size-guide-trigger');
   assert.equal($('#info-dialog').open, true);
-  click('#info-dialog [data-close]');
-  click('[data-size="M"]');
-  click('[data-purchase-step="1"]');
-  submit();
+  await click('#info-dialog [data-close]');
+  await click('[data-size="M"]');
+  await click('[data-purchase-step="1"]');
+  await submit();
   assert.equal($('#bag-dialog').open, true);
   assert.equal($('.bag-count').textContent, '2');
   assert.equal($('#bag-subtotal').textContent, '$490');
-  click('[data-change="-1"]');
+  await click('[data-change="-1"]');
   assert.equal($('#bag-subtotal').textContent, '$245');
-  click('#checkout-trigger');
-  assert.match($('#info-body').textContent, /payments are not connected/);
+  await click('#checkout-trigger');
+  assert.equal(window.location.pathname, '/checkout.html');
   console.log('Product pages, gallery, zoom, variant URLs, required sizes, quantity, and bag totals passed.');
 
   await load('shop.html');
   assert.equal($('.bag-count').textContent, '1', 'Bag should survive page navigation');
-  click('.bag-trigger');
+  await click('.bag-trigger');
   assert.match($('#bag-items img').src, /boreal-obsidian-front.jpg/);
   await load('product.html?id=transit');
   assert.equal($('#size-fieldset').hidden, true);
-  submit();
+  await submit();
   assert.equal($('.bag-count').textContent, '2');
   assert.equal($('#bag-subtotal').textContent, '$310');
-  click('[data-remove="1"]');
+  await click('[data-remove="1"]');
   assert.equal($('.bag-count').textContent, '1');
   console.log('Cross-page bag persistence, original product photos in the bag, one-size purchases, and removal passed.');
 
@@ -185,8 +219,8 @@ try {
     }
     const previousCount = Number($('.bag-count').textContent);
     const previousTotal = Number($('#bag-subtotal').textContent.replace(/[^0-9]/g, ''));
-    if (product.sizes.length > 1) click('[data-size="M"]');
-    submit();
+    if (product.sizes.length > 1) await click('[data-size="M"]');
+    await submit();
     assert.equal($('#bag-dialog').open, true);
     assert.equal(Number($('.bag-count').textContent), previousCount + 1);
     assert.equal(Number($('#bag-subtotal').textContent.replace(/[^0-9]/g, '')), previousTotal + product.price);
@@ -206,20 +240,70 @@ try {
   assert.equal($('.product-not-found a').getAttribute('href'), 'shop.html');
   await load('shop.html?category=not-a-category');
   assert.equal($$('#product-grid .product-card').length, products.length);
+  const serverCount = $('.bag-count').textContent;
   state.set('aurora-atlas-bag-v1', '[null,{"id":"__proto__"},{"id":"missing"}]');
   await window.happyDOM.abort(); window = null;
   await load('index.html');
-  assert.equal($('.bag-count').textContent, '0');
+  assert.equal($('.bag-count').textContent, serverCount, 'The server bag should survive corrupt browser storage');
   const sceneCode = await readFile('scene.js', 'utf8');
-  window.eval(sceneCode);
+  await window.eval(sceneCode);
   assert.equal($('#product-scene').hidden, true);
-  click('[data-hero-color="teal"]');
+  await click('[data-hero-color="teal"]');
   assert.match($('.hero-feature [data-product]').href, /color=teal/);
   input('#newsletter-email', 'explorer@example.com');
+  $('#newsletter-consent').checked = true;
   $('#newsletter-form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
-  assert.match($('#newsletter-message').textContent, /saved in this browser/);
+  await idle();
+  assert.match($('#newsletter-message').textContent, /on the list/);
+  assert.equal(app.store.db.prepare('SELECT COUNT(*) AS n FROM subscribers').get().n, 1);
   console.log('All product/color URLs, missing products, invalid categories, corrupted storage, no-WebGL navigation, and newsletter passed.');
-  console.log('All DOM and local-asset checks passed. Browser visual checks are a separate step.');
+  await load('checkout.html');
+  await window.eval(await readFile('checkout.js', 'utf8'));
+  assert.equal($('#checkout-layout').hidden, false);
+  assert.equal($$('#checkout-items .summary-item').length, window.AuroraAPI.cart.items.length);
+  for (const [name, value] of Object.entries({ name:'Sample Customer', email:'checkout@example.com', address1:'123 Example Street', city:'Austin', state:'TX', postalCode:'78701' })) input(`[name="${name}"]`, value, 'change');
+  $('#checkout-form').dispatchEvent(new window.Event('submit', { bubbles:true, cancelable:true }));
+  await idle();
+  assert.equal(window.location.pathname, '/order.html', $('#checkout-error').textContent);
+  const placedUrl = window.location.href;
+  assert.equal(app.store.db.prepare('SELECT COUNT(*) AS n FROM orders').get().n, 1);
+  await load(placedUrl);
+  await window.eval(await readFile('order.js', 'utf8'));
+  assert.equal($('#order-content').hidden, false);
+  assert.match($('#order-status').textContent, /confirmed.*due on delivery/);
+  assert.match($('#order-reference').textContent, /^AA-/);
+  assert.equal($('.bag-count').textContent, '0');
+  await load('admin.html');
+  await window.eval(await readFile('admin.js', 'utf8'));
+  assert.equal($('#admin-login').hidden, false);
+  assert.equal($('#admin-dashboard').hidden, true);
+  input('#admin-login [name="email"]', 'owner@example.com');
+  input('#admin-login [name="password"]', 'Test-owner-password-42');
+  $('#admin-login').dispatchEvent(new window.Event('submit', { bubbles:true, cancelable:true }));
+  await idle();
+  assert.equal($('#admin-dashboard').hidden, false, $('#admin-error').textContent);
+  assert.equal($$('.admin-order').length, 1);
+  assert.match($('#panel-subscribers').textContent, /explorer@example.com/);
+  await click('[data-admin-tab="inventory"]');
+  assert.equal($('#panel-inventory').hidden, false);
+  input('[data-product-id="core"] [name="variant"]', 'obsidian|M', 'change');
+  input('[data-product-id="core"] [name="price"]', '39.99');
+  // Happy DOM compares fractional number steps without browser rounding tolerance.
+  // Server integer-cent validation is tested separately; retain the real HTML step=0.01.
+  $('[data-product-id="core"] [name="price"]').step = 'any';
+  input('[data-product-id="core"] [name="stock"]', '0');
+  assert($('[data-product-id="core"]').checkValidity(), JSON.stringify([...$('[data-product-id="core"]').elements].map((element) => ({ name:element.name, value:element.value, validationMessage:element.validationMessage, valid:element.validity?.valid, stepMismatch:element.validity?.stepMismatch }))));
+  $('[data-product-id="core"]').dispatchEvent(new window.Event('submit', { bubbles:true, cancelable:true }));
+  await idle();
+  assert.match($('#admin-status').textContent, /saved/, $('#admin-error').textContent);
+  await load('product.html?id=core&color=obsidian');
+  assert.match($('#detail-price').textContent, /39\.99/);
+  await click('[data-size="M"]');
+  assert.equal($('.add-to-bag').disabled, true);
+  assert.match($('#stock-message').textContent, /sold out/);
+  console.log('Connected checkout, persisted confirmation, admin login, inventory pricing, newsletter management, and sold-out options passed.');
+  console.log('All DOM and local-asset checks passed against an isolated real API. Browser visual checks are a separate step.');
 } finally {
   await window?.happyDOM.abort();
+  const closed = once(app.server, 'close'); app.server.close(); app.server.closeAllConnections(); await closed;
 }
