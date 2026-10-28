@@ -216,6 +216,38 @@
         "Upper detail",
         "Fabric detail"
       ]
+    },
+    {
+      "id": "contour",
+      "name": "Contour V-Neck Knit",
+      "type": "A softer approach to getting dressed",
+      "price": 95,
+      "colors": [
+        "obsidian"
+      ],
+      "description": "A familiar knit with a little more shape. A V neckline and relaxed shoulders make it an easy layer over a tee or a crisp shirt.",
+      "features": [
+        "V neckline",
+        "Relaxed shoulders",
+        "Ribbed edges"
+      ],
+      "details": "A long-sleeved knit with a V-shaped neckline, ribbed cuffs, and a ribbed hem. The dark finish keeps it easy to wear across the week.",
+      "fit": "A relaxed knit silhouette. Use your chest measurement and leave room for an underlayer.",
+      "category": "essentials",
+      "badge": "",
+      "sizes": [
+        "XS",
+        "S",
+        "M",
+        "L",
+        "XL"
+      ],
+      "care": "Follow the original garment care label. Wash with similar colors, reshape gently, and dry away from direct heat.",
+      "gallery": [
+        "Full view",
+        "Upper detail",
+        "Fabric detail"
+      ]
     }
   ];
   const catalog = Object.fromEntries(products.map((product) => [product.id, product]));
