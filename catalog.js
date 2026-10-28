@@ -50,6 +50,39 @@
       fit: 'One size with an adjustable strap. Room for your phone, wallet, keys, and the small things that make a day.',
       care: 'Spot clean with a damp cloth and mild soap. Air dry away from direct heat. Do not machine dry.',
       gallery: ['Full view', 'Strap detail', 'Fabric detail']
+    },
+    {
+      "id": "core",
+      "name": "Core Crew Tee",
+      "type": "The starting point for every day",
+      "price": 32,
+      "colors": [
+        "obsidian",
+        "navy"
+      ],
+      "description": "A clean crew neck and an easy silhouette. The simple tee that starts a good everyday uniform, worn on its own or beneath your favorite layer.",
+      "features": [
+        "Classic crew neck",
+        "Short sleeves",
+        "Straight hem"
+      ],
+      "details": "A short-sleeved tee with a narrow crew neckline, clean seams, and a straight hem.",
+      "fit": "A regular fit. Choose your usual size, or size up for a looser silhouette.",
+      "category": "essentials",
+      "badge": "",
+      "sizes": [
+        "XS",
+        "S",
+        "M",
+        "L",
+        "XL"
+      ],
+      "care": "Follow the original garment care label. Wash with similar colors, reshape gently, and dry away from direct heat.",
+      "gallery": [
+        "Full view",
+        "Upper detail",
+        "Fabric detail"
+      ]
     }
   ];
   const catalog = Object.fromEntries(products.map((product) => [product.id, product]));
