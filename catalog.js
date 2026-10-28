@@ -381,6 +381,39 @@
         "Upper detail",
         "Fabric detail"
       ]
+    },
+    {
+      "id": "field",
+      "name": "Field Graphic Long Sleeve",
+      "type": "A small detail. A fresh perspective.",
+      "price": 55,
+      "colors": [
+        "obsidian",
+        "chalk"
+      ],
+      "description": "Everyday ease with a little character. A round-neck long-sleeved top with a small illustrated chest detail and a relaxed shape.",
+      "features": [
+        "Small chest illustration",
+        "Round neckline",
+        "Easy long sleeves"
+      ],
+      "details": "A long-sleeved crew top with a small decorative graphic at the chest. The reference photo shows the original supplier artwork.",
+      "fit": "A relaxed, shorter silhouette. Check both chest fit and your preferred body length when selecting a size.",
+      "category": "essentials",
+      "badge": "",
+      "sizes": [
+        "XS",
+        "S",
+        "M",
+        "L",
+        "XL"
+      ],
+      "care": "Follow the original garment care label. Wash with similar colors, reshape gently, and dry away from direct heat.",
+      "gallery": [
+        "Full view",
+        "Upper detail",
+        "Fabric detail"
+      ]
     }
   ];
   const catalog = Object.fromEntries(products.map((product) => [product.id, product]));
