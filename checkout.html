@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0e0d"><meta name="robots" content="noindex">
+  <title>Checkout — Aurora Atlas</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css"><link rel="stylesheet" href="commerce.css">
+  <script defer src="catalog.js"></script><script defer src="api.js"></script><script defer src="main.js"></script><script defer src="checkout.js"></script>
+</head>
+<body data-page="checkout">
+  <a class="skip-link" href="#main">Skip to content</a><div data-site-header></div>
+  <main id="main" class="commerce-page section-wrap">
+    <div class="commerce-heading"><p class="eyebrow">THE NEXT CHAPTER</p><h1>Make it yours<span class="accent">.</span></h1><p>One considered choice. Ready for your everyday.</p></div>
+    <p id="checkout-error" class="commerce-error" role="alert" hidden></p>
+    <section id="pending-checkout" class="commerce-panel" hidden><h2>Your payment is waiting.</h2><p>Your pieces are reserved for up to 30 minutes. Continue to payment, or cancel this checkout to edit your bag.</p><div class="commerce-actions"><button id="resume-payment" class="button button-lime">Continue to secure payment ↗</button><button id="cancel-payment" class="text-link">Cancel checkout</button></div></section>
+    <div id="checkout-layout" class="checkout-layout" hidden>
+      <form id="checkout-form" class="commerce-panel">
+        <h2>01 / Your details</h2>
+        <div class="form-fields"><label>Full name<input name="name" autocomplete="name" minlength="2" maxlength="100" required></label><label>Email address<input name="email" type="email" autocomplete="email" maxlength="254" required></label></div>
+        <h2>02 / Where it’s going</h2>
+        <div class="form-fields"><label class="full-width">Street address<input name="address1" autocomplete="shipping address-line1" minlength="3" maxlength="150" required></label><label class="full-width">Apartment, suite, etc. <span class="muted">(optional)</span><input name="address2" autocomplete="shipping address-line2" maxlength="100"></label><label>City<input name="city" autocomplete="shipping address-level2" minlength="2" maxlength="100" required></label><label>State<select name="state" id="checkout-state" autocomplete="shipping address-level1" required><option value="">Choose a state</option></select></label><label>ZIP code<input name="postalCode" autocomplete="shipping postal-code" inputmode="numeric" pattern="[0-9]{5}(-[0-9]{4})?" maxlength="10" required></label><label>Country<select name="country" autocomplete="shipping country"><option value="US">United States</option></select></label></div>
+        <h2>03 / Payment</h2><div id="payment-options" class="payment-options"></div>
+        <p class="commerce-note">Review your delivery details and total before placing your order. Your confirmation will be available immediately in this browser.</p>
+        <button id="place-order" class="button button-lime" type="submit">Place order <span>↗</span></button>
+      </form>
+      <aside class="commerce-panel order-summary" aria-labelledby="summary-heading"><h2 id="summary-heading">Your everyday, upgraded.</h2><div id="checkout-items"></div><dl id="checkout-totals" class="order-totals"></dl><a href="shop.html" class="text-link">Keep exploring ↗</a></aside>
+    </div>
+    <section id="checkout-empty" class="commerce-panel empty-checkout" hidden><span class="accent">↗</span><h2>A little room for possibility.</h2><p>Your bag is empty. Find your next everyday essential.</p><a href="shop.html" class="button button-lime">Explore the collection ↗</a></section>
+  </main><div data-site-footer></div><noscript>Please enable JavaScript to check out.</noscript>
+</body>
+</html>
