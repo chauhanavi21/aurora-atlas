@@ -1,0 +1,20 @@
+{
+  "name": "aurora-atlas",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aurora Atlas storefront and SQLite commerce backend",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server/start.mjs",
+    "dev": "node --env-file-if-exists=.env --watch server/start.mjs",
+    "test": "node --test tests/*.test.mjs && node scripts/verify-pages.mjs",
+    "test:api": "node --test tests/*.test.mjs",
+    "test:ui": "node scripts/verify-pages.mjs",
+    "admin:create": "node --env-file-if-exists=.env scripts/create-admin.mjs"
+  },
+  "devDependencies": {
+    "happy-dom": "^21.0.4"
+  }
+}
