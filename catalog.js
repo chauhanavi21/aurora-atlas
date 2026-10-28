@@ -512,6 +512,39 @@
         "Upper detail",
         "Fabric detail"
       ]
+    },
+    {
+      "id": "metro",
+      "name": "Metro Tailored Trousers",
+      "type": "A sharper line for everyday plans",
+      "category": "bottoms",
+      "price": 98,
+      "colors": [
+        "navy",
+        "obsidian"
+      ],
+      "description": "A little more polish, just as much possibility. Flat-front trousers with a clean leg and simple pocket details, ready for a shirt or a favorite tee.",
+      "features": [
+        "Flat-front waistband",
+        "Clean leg line",
+        "Belt loops"
+      ],
+      "details": "Tailored-looking trousers with a flat front, belt loops, side pockets, and a straight-to-tapered leg.",
+      "fit": "A neat waist with a straight-to-tapered leg. Start with your natural waist measurement in the size guide.",
+      "badge": "",
+      "sizes": [
+        "XS",
+        "S",
+        "M",
+        "L",
+        "XL"
+      ],
+      "care": "Follow the original garment care label. Wash with similar colors, reshape gently, and dry away from direct heat.",
+      "gallery": [
+        "Full view",
+        "Upper detail",
+        "Fabric detail"
+      ]
     }
   ];
   const catalog = Object.fromEntries(products.map((product) => [product.id, product]));
