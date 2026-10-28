@@ -583,5 +583,6 @@
   const catalog = Object.fromEntries(products.map((product) => [product.id, product]));
   const photo = (product, color = product.colors[0]) => `assets/photos/${product.id}-${color}-front.jpg`;
   const productUrl = (product, color = product.colors[0]) => `product.html?id=${product.id}&color=${color}`;
-  window.AuroraCatalog = { products, catalog, colors, photo, productUrl };
+  if (typeof window !== 'undefined') window.AuroraCatalog = { products, catalog, colors, photo, productUrl };
+  if (typeof module !== 'undefined' && module.exports) module.exports = { products, colors };
 })();
