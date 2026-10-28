@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0b0e0d"><meta name="robots" content="noindex">
+  <title>Store management — Aurora Atlas</title><link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css"><link rel="stylesheet" href="commerce.css">
+  <script defer src="catalog.js"></script><script defer src="api.js"></script><script defer src="main.js"></script><script defer src="admin.js"></script>
+</head>
+<body data-page="admin"><a class="skip-link" href="#main">Skip to content</a><div data-site-header></div>
+  <main id="main" class="commerce-page section-wrap"><div class="commerce-heading"><p class="eyebrow">AURORA ATLAS / STORE MANAGEMENT</p><h1>Behind the everyday<span class="accent">.</span></h1><p>Orders, inventory, and your growing community.</p></div><p id="admin-error" class="commerce-error" role="alert" hidden></p><p id="admin-status" class="admin-status" role="status"></p>
+    <form id="admin-login" class="commerce-panel admin-login"><h2>Sign in to your store</h2><label>Email address<input name="email" type="email" autocomplete="username" maxlength="254" required></label><label>Password<input name="password" type="password" autocomplete="current-password" maxlength="128" required></label><button class="button button-lime" type="submit">Sign in ↗</button></form>
+    <section id="admin-dashboard" hidden><div class="admin-metrics" id="admin-metrics"></div><div class="admin-toolbar"><div class="admin-tabs" role="tablist" aria-label="Store management"><button id="tab-orders" data-admin-tab="orders" role="tab" aria-controls="panel-orders" aria-selected="true">Orders</button><button id="tab-inventory" data-admin-tab="inventory" role="tab" aria-controls="panel-inventory" aria-selected="false">Inventory & pricing</button><button id="tab-subscribers" data-admin-tab="subscribers" role="tab" aria-controls="panel-subscribers" aria-selected="false">Field notes</button></div><div class="commerce-actions"><button id="admin-refresh" class="text-link">Refresh ↻</button><button id="admin-logout" class="text-link">Sign out ↗</button></div></div><section id="panel-orders" class="admin-orders" role="tabpanel" aria-labelledby="tab-orders"></section><section id="panel-inventory" class="admin-inventory" role="tabpanel" aria-labelledby="tab-inventory" hidden></section><section id="panel-subscribers" class="commerce-panel admin-subscribers" role="tabpanel" aria-labelledby="tab-subscribers" hidden></section></section>
+  </main><div data-site-footer></div><noscript>Please enable JavaScript to manage the store.</noscript>
+</body>
+</html>
