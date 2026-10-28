@@ -348,6 +348,39 @@
         "Upper detail",
         "Fabric detail"
       ]
+    },
+    {
+      "id": "polar",
+      "name": "Polar Roll Neck",
+      "type": "A high collar. A quiet statement.",
+      "price": 105,
+      "colors": [
+        "chalk",
+        "obsidian"
+      ],
+      "description": "A little extra coverage, without the bulk. A close-fitting roll neck with a clean body and long sleeves for easy layering through the cooler months.",
+      "features": [
+        "Fold-over roll neck",
+        "Slim silhouette",
+        "Long sleeves"
+      ],
+      "details": "A fine knit with a fold-over high neck, long sleeves, and a close-fitting body. A simple partner for a bomber or tailored trousers.",
+      "fit": "A slim fit. Choose your usual size for a close silhouette or size up for more ease.",
+      "category": "essentials",
+      "badge": "",
+      "sizes": [
+        "XS",
+        "S",
+        "M",
+        "L",
+        "XL"
+      ],
+      "care": "Follow the original garment care label. Wash with similar colors, reshape gently, and dry away from direct heat.",
+      "gallery": [
+        "Full view",
+        "Upper detail",
+        "Fabric detail"
+      ]
     }
   ];
   const catalog = Object.fromEntries(products.map((product) => [product.id, product]));
