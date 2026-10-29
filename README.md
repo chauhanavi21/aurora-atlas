@@ -25,7 +25,8 @@ An administrator may already exist in this workspace; use the existing credentia
 ## What works
 
 - Database catalog with **70 sample products** (the original 20 plus 50 additional apparel, footwear, and accessories) and 191 locally saved product photographs.
-- Search, categories, sorting, photo galleries, zoom, dedicated product pages, and live availability.
+- Search, categories, sorting, price ranges, size/stock filters, photo galleries, zoom, dedicated product pages, and live availability. Shop filters stay in the URL for sharing and bookmarking; stock checks match the selected size.
+- Save products with the heart buttons and open **/shop.html?saved=1** to revisit them. Guest saves live in the local database for the browser session; signing in merges them with the account's saves, available across devices. Each list holds up to 100 products. Account saves stay private after logout; unpublished products are hidden until republished. Saving does not reserve stock.
 - Customer signup, sign-in, sign-out, profile names, password changes, local password recovery, and private order history.
 - Server-persisted bags tied to HttpOnly session cookies, with prices loaded from the API. Account bags persist across devices; signing in merges a guest bag within stock limits. Valid pre-backend guest bags are imported once.
 - Checkout with validated US delivery details, server-calculated USD totals, shipping, configured tax, and **cash on delivery enabled by default**.
@@ -47,6 +48,8 @@ Open **http://localhost:3000/admin.html** and use the private **.data/admin-cred
 - **Photos:** upload up to three JPEG, PNG, or WebP images per color, each up to 2 MB. Photos are stored in **.data/uploads/** and served only through generated **/media/** URLs. You can also reuse an existing local photo path. Uploaded photos are not committed to Git; include them in your store backups.
 - **Inventory & pricing:** find a product, choose any option, and update its available quantity and price. Low-stock and sold-out filters help locate options. The full product editor changes all variant quantities together. New options start at zero until stock is entered. Stock is never reserved merely by adding to a bag.
 - **Orders:** search by reference/customer, filter by status, and page through all orders. Save tracking details visible to the customer and internal notes visible only to admins. Mark orders shipped or delivered; COD delivery requires confirmation that payment was collected. Cancel unshipped COD orders to restore inventory. Order line items and totals preserve their checkout values.
+- **Order exports:** download a CSV containing all orders matching the current search and status filter, up to 10,000 records. Exports contain private customer delivery details and are recorded in the activity log. Spreadsheet formula protection applies to customer-supplied values.
+- **Sales reports:** choose the last 7, 30, 90, or 365 days. View collected payments, outstanding COD, order counts, paid units, top products, a trend chart, and daily totals. Periods include today and use UTC order placement dates. Collected totals include shipping and tax; product rankings use historical merchandise prices. Cancelled orders and payments awaiting review are excluded from sales. These are reports for orders placed in the period, rather than payment-date accounting statements.
 - **Customers:** search accounts, correct names, find their orders, revoke all sessions, and disable/enable account access. Disabling an account also revokes recovery links; it preserves its order history. Email ownership changes are unavailable.
 - **Field notes:** search, paginate, remove subscribers, and export all subscribers to CSV. The export protects against spreadsheet formulas. Messages are not sent automatically.
 - **Store & homepage:** edit announcements, hero/story/newsletter copy, featured products, footer tagline, support email, shipping/return/care information, free-shipping threshold, delivery charges, tax, COD availability, and checkout/subscription switches. Archived featured products stay hidden. Changes appear on the next storefront page load; checkout recalculates saved settings and rejects outdated totals.
@@ -99,6 +102,8 @@ npm.cmd test
 ~~~
 
 API and DOM integration tests use isolated real servers and in-memory databases; migration/restart and upload tests use temporary files. Coverage includes authentication, account isolation, all 70 products and 191 photos, product creation/editing/publication, image uploads, archived products, retired variants, stock races, duplicate orders, server pricing, store settings, private notes/tracking, customer controls, subscriber pagination, admin password changes, CSRF/origin checks, and signed Stripe webhooks. Tests exercise dashboard forms through the real API, including escaped product/content text. Test accounts and orders never enter the running store's database.
+
+Additional coverage verifies private saved lists, guest/account merging, saved-list limits and restart persistence, combined shop filters and shared URLs, historical sales totals, UTC reporting boundaries, COD accounting, protected order exports, CSV formula escaping, and dashboard downloads.
 
 For Chrome layout checks, start the app and run:
 
