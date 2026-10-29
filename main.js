@@ -43,6 +43,14 @@
   const savingProducts = new Set();
   if(page==='shop') {
     $('.shop-categories').insertAdjacentHTML('afterend','<div class="collection-refinements"><label class="collection-check"><input type="checkbox" id="filter-saved">Saved products only</label><p class="saved-help">Save pieces with the heart button. Sign in to keep them across devices.</p></div>');
+    $('.collection-refinements').insertAdjacentHTML('afterbegin',`<fieldset class="price-refinement"><legend>Price (USD)</legend><div><label>From<input id="filter-min" type="number" min="0" max="100000" step="0.01" inputmode="decimal" placeholder="0"></label><label>To<input id="filter-max" type="number" min="0" max="100000" step="0.01" inputmode="decimal" placeholder="Any"></label></div></fieldset><label class="size-refinement">Size<select id="filter-size"><option value="">All sizes</option>${[...new Set(products.flatMap((p)=>p.sizes))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})).map((size)=>`<option value="${escapeHtml(size)}">${escapeHtml(size)}</option>`).join('')}</select></label><label class="collection-check"><input type="checkbox" id="filter-stock">In stock only</label><p id="filter-error" class="filter-error" role="status" hidden></p><button id="clear-refinements" type="button" class="clear-refinements">Clear filters</button>`);
+    for(const key of ['min','max']) {
+      const value=params.get(key),price=Number(value);
+      if(value && Number.isFinite(price) && price>=0 && price<=100000)$('#filter-'+key).value=value;
+    }
+    if([...$('#filter-size').options].some((option)=>option.value===params.get('size')))$('#filter-size').value=params.get('size');
+    $('#filter-stock').checked=params.get('stock')==='1';
+    for(const key of ['min','max','size','stock'])$('#filter-'+key).addEventListener(['min','max'].includes(key)?'input':'change',renderCollection);
     $('#filter-saved').checked=params.get('saved')==='1';
     $('#filter-saved').addEventListener('change',renderCollection);
   }
@@ -133,6 +141,8 @@
     const query = new URLSearchParams();
     if (activeFilter !== 'all') query.set('category', activeFilter);
     if ($('#filter-saved')?.checked) query.set('saved','1');
+    for(const key of ['min','max','size'])if($('#filter-'+key)?.value)query.set(key,$('#filter-'+key).value);
+    if($('#filter-stock')?.checked)query.set('stock','1');
     const search = $('#product-search').value.trim();
     if (search) query.set('q', search);
     if ($('#product-sort').value !== 'featured') query.set('sort', $('#product-sort').value);
@@ -142,7 +152,11 @@
   function renderCollection() {
     if (!$('#product-grid')) return;
     const query = $('#product-search').value.trim().toLowerCase();
-    const visible = products.filter((product) => (activeFilter === 'all' || product.category === activeFilter) && `${product.name} ${product.type} ${product.category}`.toLowerCase().includes(query) && (!$('#filter-saved')?.checked || isSaved(product.id)));
+    const min=$('#filter-min')?.value,max=$('#filter-max')?.value,size=$('#filter-size')?.value || '',inStock=$('#filter-stock')?.checked;
+    const minCents=min?Math.round(Number(min)*100):0,maxCents=max?Math.round(Number(max)*100):Infinity;
+    const valid=!['min','max'].some((key)=>$('#filter-'+key) && !$('#filter-'+key).validity.valid) && minCents<=maxCents;
+    if($('#filter-error')) {$('#filter-error').hidden=valid;$('#filter-error').textContent='Enter a valid price range with a maximum at least as high as the minimum.';}
+    const visible = products.filter((product) => valid && (activeFilter === 'all' || product.category === activeFilter) && `${product.name} ${product.type} ${product.category}`.toLowerCase().includes(query) && (!$('#filter-saved')?.checked || isSaved(product.id)) && Math.round(product.price*100)>=minCents && Math.round(product.price*100)<=maxCents && (!size || product.sizes.includes(size)) && (!inStock || product.variants?.some((variant)=>(!size || variant.size===size) && variant.stock>0)));
     const sort = $('#product-sort')?.value;
     if (sort === 'price-low') visible.sort((a, b) => a.price - b.price);
     if (sort === 'price-high') visible.sort((a, b) => b.price - a.price);
@@ -188,6 +202,10 @@
     const similar = products.filter((item) => item.id !== product.id && item.category === product.category);
     const complementary = products.filter((item) => item.category !== product.category);
     return [...similar.slice(0, 2), ...complementary, ...similar.slice(2)].slice(0, 3);
+  }
+  function clearRefinements() {
+    for(const key of ['min','max','size'])if($('#filter-'+key))$('#filter-'+key).value='';
+    for(const key of ['stock','saved'])if($('#filter-'+key))$('#filter-'+key).checked=false;
   }
 
   function renderProduct() {
@@ -332,7 +350,8 @@
       else if (api && !api.available) toast('The store is unavailable. Refresh before checking out.');
       else location.href = 'checkout.html';
     }
-    if (target.id === 'reset-collection') { activeFilter = 'all'; $('#product-search').value = ''; $('#product-sort').value = 'featured'; if($('#filter-saved'))$('#filter-saved').checked=false; renderCollection(); }
+    if(target.id==='clear-refinements'){clearRefinements();renderCollection();}
+    if (target.id === 'reset-collection') { activeFilter = 'all'; $('#product-search').value = ''; $('#product-sort').value = 'featured'; clearRefinements(); renderCollection(); }
     if (target.id === 'story-trigger') location.href = 'shop.html';
     if (target.closest('.mobile-nav')) {
       $('.mobile-nav').hidden = true;
