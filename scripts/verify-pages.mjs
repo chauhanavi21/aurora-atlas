@@ -169,6 +169,21 @@ try {
   console.log('Shop categories, sorting, search, empty results, mobile menu, and local links passed.');
 
   await load('product.html?id=boreal&color=teal');
+  await click('[data-save-product="boreal"]');
+  assert.equal($('[data-save-product="boreal"]').getAttribute('aria-pressed'),'true');
+  assert.equal($('.saved-count').textContent,'1');
+  await load('shop.html?saved=1');
+  assert.equal($('#filter-saved').checked,true);
+  assert.equal($('#results-title').textContent,'Saved products');
+  assert.equal($$('#product-grid .product-card').length,1);
+  assert.equal($('#product-grid [data-product]').dataset.product,'boreal');
+  await click('[data-save-product="boreal"]');
+  assert.equal($$('#product-grid .product-card').length,0);
+  assert.equal($('#no-results').hidden,false);
+  await click('#reset-collection');
+  assert.equal($$('#product-grid .product-card').length,products.length);
+  assert.equal(new URLSearchParams(window.location.search).has('saved'),false);
+  await load('product.html?id=boreal&color=teal');
   assert.equal(document.title, 'Boreal Puffer — Aurora Atlas');
   assert.equal($('#detail-color-name').textContent, 'Deep teal');
   assert.match($('#detail-image').src, /boreal-teal-front.jpg/);

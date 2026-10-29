@@ -38,6 +38,43 @@
     if (!$('#toast')) document.body.insertAdjacentHTML('beforeend', '<div id="toast" class="toast" role="status" aria-live="polite"></div>');
   }
   mountSharedLayout();
+  $('.header-actions .bag-trigger').insertAdjacentHTML('beforebegin','<a class="saved-link" href="shop.html?saved=1" aria-label="Saved products"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg><span class="saved-count">0</span></a>');
+  $('.mobile-nav').insertAdjacentHTML('beforeend','<a href="shop.html?saved=1">Saved products</a>');
+  const savingProducts = new Set();
+  if(page==='shop') {
+    $('.shop-categories').insertAdjacentHTML('afterend','<div class="collection-refinements"><label class="collection-check"><input type="checkbox" id="filter-saved">Saved products only</label><p class="saved-help">Save pieces with the heart button. Sign in to keep them across devices.</p></div>');
+    $('#filter-saved').checked=params.get('saved')==='1';
+    $('#filter-saved').addEventListener('change',renderCollection);
+  }
+  const isSaved = (id) => api?.savedProducts.includes(id) || false;
+  function savedButton(id, detail=false) {
+    return `<button type="button" class="save-product ${detail?'save-product-detail':''}" data-save-product="${id}" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg>${detail?'<span>Save for later</span>':''}</button>`;
+  }
+  function syncSavedButtons() {
+    $$('.product-card').forEach((card)=>{
+      const id=card.querySelector('[data-product]')?.dataset.product;
+      if(id && !card.querySelector('[data-save-product]'))card.insertAdjacentHTML('beforeend',savedButton(id));
+    });
+    $$('[data-save-product]').forEach((button)=>{
+      const id=button.dataset.saveProduct,saved=isSaved(id);
+      button.setAttribute('aria-pressed',String(saved));
+      button.setAttribute('aria-label',`${saved?'Remove':'Save'} ${catalog[id]?.name || 'product'} ${saved?'from saved products':'for later'}`);
+      button.disabled=!api?.available || savingProducts.has(id);
+      if(button.querySelector('span'))button.querySelector('span').textContent=saved?'Saved for later':'Save for later';
+    });
+    const count=api?.savedProducts.length || 0;
+    $('.saved-count').textContent=String(count);
+    $('.saved-link').setAttribute('aria-label',`Saved products, ${count} piece${count===1?'':'s'}`);
+  }
+  async function toggleSavedProduct(id) {
+    if(!api?.available || savingProducts.has(id))return;
+    savingProducts.add(id);syncSavedButtons();
+    const value=!isSaved(id);
+    try{await api.setSavedProduct(id,value);toast(value?'Saved for your next visit.':'Removed from saved products.');}
+    catch(error){toast(error.message);}
+    finally{savingProducts.delete(id);syncSavedButtons();}
+  }
+  window.addEventListener('aurora:saved',()=>{if(page==='shop' && $('#filter-saved')?.checked)renderCollection();syncSavedButtons();});
   $$('.shop-categories,.filters').forEach((group)=>group.insertAdjacentHTML('beforeend','<button data-filter="footwear" aria-pressed="false">Footwear <span data-category-count="footwear"></span></button>'));
   $('.mobile-nav').insertAdjacentHTML('beforeend','<a href="shop.html?category=footwear">Footwear</a>');
   if (api?.admin) $('.header-actions').insertAdjacentHTML('afterbegin','<a class="admin-nav-link" href="admin.html">Admin ↗</a>');
@@ -95,6 +132,7 @@
     if (page !== 'shop') return;
     const query = new URLSearchParams();
     if (activeFilter !== 'all') query.set('category', activeFilter);
+    if ($('#filter-saved')?.checked) query.set('saved','1');
     const search = $('#product-search').value.trim();
     if (search) query.set('q', search);
     if ($('#product-sort').value !== 'featured') query.set('sort', $('#product-sort').value);
@@ -104,7 +142,7 @@
   function renderCollection() {
     if (!$('#product-grid')) return;
     const query = $('#product-search').value.trim().toLowerCase();
-    const visible = products.filter((product) => (activeFilter === 'all' || product.category === activeFilter) && `${product.name} ${product.type} ${product.category}`.toLowerCase().includes(query));
+    const visible = products.filter((product) => (activeFilter === 'all' || product.category === activeFilter) && `${product.name} ${product.type} ${product.category}`.toLowerCase().includes(query) && (!$('#filter-saved')?.checked || isSaved(product.id)));
     const sort = $('#product-sort')?.value;
     if (sort === 'price-low') visible.sort((a, b) => a.price - b.price);
     if (sort === 'price-high') visible.sort((a, b) => b.price - a.price);
@@ -114,10 +152,11 @@
       ? (activeFilter === 'all' && !query ? homeEdit : visible.slice(0, 4))
       : visible;
     $('#product-grid').innerHTML = shown.map(card).join('');
+    syncSavedButtons();
     $('#no-results').hidden = visible.length > 0;
     const preview = shown.length < visible.length ? `${shown.length} of ` : '';
     $('.collection-count').textContent = `${preview}${visible.length} considered essential${visible.length === 1 ? '' : 's'}`;
-    if ($('#results-title')) $('#results-title').textContent = categories[activeFilter];
+    if ($('#results-title')) $('#results-title').textContent = $('#filter-saved')?.checked ? 'Saved products' : categories[activeFilter];
     if ($('#view-all')) {
       const queryParams = new URLSearchParams();
       if (activeFilter !== 'all') queryParams.set('category', activeFilter);
@@ -170,6 +209,8 @@
       <div class="product-purchase"><p class="eyebrow">AA / ${p.category.toUpperCase()} / ${String(products.findIndex((item)=>item.id === p.id) + 1).padStart(3, '0')}</p><h1 id="detail-title">${p.name}</h1><p class="product-subtitle">${p.type}</p><p id="detail-price" class="product-page-price">${money(p.price)} <span>USD</span></p><p class="product-page-description">${p.description}</p><div class="feature-tags">${p.features.map((feature) => `<span>${feature}</span>`).join('')}</div><form id="product-form"><fieldset><legend>Color — <span id="detail-color-name">${colors[selectedColor].name}</span></legend><div id="detail-colors" class="detail-colors"></div></fieldset><fieldset id="size-fieldset" ${p.sizes.length === 1 ? 'hidden' : ''}><legend><span>Choose your size</span><button type="button" id="size-guide-trigger">Size guide ↗</button></legend><div id="detail-sizes" class="size-options">${p.sizes.map((size) => `<button type="button" data-size="${size}" aria-pressed="false">${size}</button>`).join('')}</div><p class="size-note">${p.fit}</p><p id="size-error" class="form-error" role="alert" hidden>Choose a size before adding this piece to your bag.</p></fieldset><p id="stock-message" class="stock-note" role="status"></p><div class="purchase-row"><div class="purchase-quantity"><button type="button" data-purchase-step="-1" aria-label="Decrease quantity">−</button><label class="sr-only" for="product-quantity">Quantity</label><input id="product-quantity" type="number" min="1" max="99" step="1" value="1" required><button type="button" data-purchase-step="1" aria-label="Increase quantity">+</button></div><button type="submit" class="button button-lime add-to-bag">Add to bag <span>↗</span></button></div></form><div class="product-delivery"><span>↗ <span>Complimentary shipping<br><small>On orders $150 and over</small></span></span><span>↺ <span>Take your time<br><small>30 days to find your fit</small></span></span></div><div class="product-accordions"><details open><summary>The details <span>+</span></summary><p>${p.details}</p></details><details><summary>Fit & sizing <span>+</span></summary><p>${p.fit}</p></details><details><summary>Care for your equipment <span>+</span></summary><p>${p.care}</p></details><details><summary>Shipping & returns <span>+</span></summary><p>Standard delivery is available within the United States. Review the shipping charge and delivery address at checkout. Keep your order reference for help with your delivery or a return.</p></details></div></div></section>
       <section class="product-detail-story"><div><p class="eyebrow">PURPOSE IN EVERY PIECE</p><h2>All the detail.<br>None of the excess.</h2></div><div>${p.features.map((feature, index) => `<div><span>0${index + 1}</span><h3>${feature}</h3></div>`).join('')}</div></section><section class="related-products" aria-labelledby="related-heading"><div class="section-heading"><div><p class="eyebrow">GOOD COMPANY FOR YOUR NEXT CHAPTER</p><h2 id="related-heading">Better together.</h2></div><a href="shop.html" class="text-link">Explore all equipment <span>↗</span></a></div><div class="product-grid">${relatedProducts(p).map(card).join('')}</div></section>`;
     $('.photo-reference').textContent = selectedProduct.photoCredit || 'Concept collection · Reference product photography. Detail views are close-up crops.';
+    $('#product-form').insertAdjacentHTML('afterend',savedButton(p.id,true));
+    syncSavedButtons();
     $('.product-delivery').innerHTML = `<span>↗ <span>Complimentary shipping<br><small>From ${money((preferences.freeShippingCents ?? 15000)/100)}</small></span></span><span>↺ <span>Take your time<br><small>${preferences.returnDays ?? 30} days to find your fit</small></span></span>`;
     $('.product-accordions>details:last-child>p').textContent = `${preferences.shippingPolicy || ''} ${preferences.returnPolicy || ''}`;
     updateProductColor(false);
@@ -266,6 +307,7 @@
     const target = event.target.closest('button,a'); if (!target) return;
     if (target.hasAttribute('data-close')) target.closest('dialog').close();
     if (target.hasAttribute('data-filter')) { activeFilter = target.dataset.filter; renderCollection(); }
+    if (target.hasAttribute('data-save-product')) toggleSavedProduct(target.dataset.saveProduct);
     if (target.hasAttribute('data-detail-color')) { selectedColor = target.dataset.detailColor; updateProductColor(); }
     if (target.hasAttribute('data-size')) {
       selectedSize = target.dataset.size; $('#size-error').hidden = true; updateAvailability();
@@ -290,7 +332,7 @@
       else if (api && !api.available) toast('The store is unavailable. Refresh before checking out.');
       else location.href = 'checkout.html';
     }
-    if (target.id === 'reset-collection') { activeFilter = 'all'; $('#product-search').value = ''; $('#product-sort').value = 'featured'; renderCollection(); }
+    if (target.id === 'reset-collection') { activeFilter = 'all'; $('#product-search').value = ''; $('#product-sort').value = 'featured'; if($('#filter-saved'))$('#filter-saved').checked=false; renderCollection(); }
     if (target.id === 'story-trigger') location.href = 'shop.html';
     if (target.closest('.mobile-nav')) {
       $('.mobile-nav').hidden = true;
@@ -322,6 +364,7 @@
   });
   renderCollection();
   if (page === 'product') renderProduct();
+  syncSavedButtons();
   updateBag();
   $$('dialog').forEach((dialog) => dialog.addEventListener('click', (event) => {
     if (event.target !== dialog) return;
