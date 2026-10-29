@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { HttpError, text, email, integer, passwordMatchesAsync, passwordHashAsync } from './store.mjs';
 import { nameValue, passwordError, publicCustomer } from './auth.mjs';
 import { settingTextLimits } from './settings.mjs';
+import { salesReport, orderFilter, ordersCsv } from './reports.mjs';
 
 const categories = ['outerwear','essentials','bottoms','accessories','footwear'];
 const plain = (value, name, max, optional = false) => {
@@ -58,6 +59,17 @@ export function createManagement({ store, config, root, send, body, cookie, limi
   const adminOrder = (row) => ({ ...store.publicOrder(row), adminNotes:row.admin_notes || '' });
   async function handle(req,res,url,current) {
     const path = url.pathname, adminId = current.admin_id;
+    if(path==='/api/admin/reports' && req.method==='GET') {
+      send(res,200,salesReport(db,Number(url.searchParams.get('days') || 30)));return true;
+    }
+    if(path==='/api/admin/orders/export' && req.method==='GET') {
+      limit(req,'export-orders',10);
+      const {where,parameters}=orderFilter(url);
+      const rows=db.prepare(`SELECT * FROM orders ${where} ORDER BY created DESC,id LIMIT 10001`).all(...parameters);
+      if(rows.length>10000)throw new HttpError(400,'Narrow your order search to export at most 10,000 orders.');
+      const csv=ordersCsv(rows);audit(adminId,'export_orders',String(rows.length));
+      res.writeHead(200,{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="aurora-orders.csv"','Cache-Control':'no-store'});res.end(csv);return true;
+    }
     if (path === '/api/admin/overview' && req.method === 'GET') {
       const count = (table, where='') => db.prepare(`SELECT COUNT(*) AS n FROM ${table} ${where}`).get().n;
       send(res,200,{
@@ -152,9 +164,7 @@ export function createManagement({ store, config, root, send, body, cookie, limi
       send(res,200,{settings:store.settings()}); return true;
     }
     if (path === '/api/admin/orders' && req.method === 'GET') {
-      const page = pagination(url), status = url.searchParams.get('status') || '';
-      const where = "WHERE (reference LIKE ? OR customer LIKE ?) AND (?='' OR status=?)";
-      const parameters = [page.pattern,page.pattern,status,status];
+      const page = pagination(url), {where,parameters}=orderFilter(url);
       send(res,200,{items:db.prepare(`SELECT * FROM orders ${where} ORDER BY created DESC,id LIMIT ? OFFSET ?`).all(...parameters,page.limit,page.offset).map(adminOrder),total:db.prepare(`SELECT COUNT(*) AS n FROM orders ${where}`).get(...parameters).n,...page}); return true;
     }
     const orderPath = /^\/api\/admin\/orders\/([a-f0-9-]{36})$/.exec(path);

@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createApp, configuration } from '../server/app.mjs';
 import { passwordHash } from '../server/store.mjs';
+import { csvCell, salesReport } from '../server/reports.mjs';
 
 const adminPassword='Meadow sunrise trail!52', customerPassword='Wandering river path!73';
 const encodedAdmin=passwordHash(adminPassword);
@@ -33,9 +34,48 @@ async function fixture(t,overrides={}) {
 function sampleProduct(id='new-sample'){
   return{id,priceCents:4567,initialStock:7,active:false,product:{name:'Weekend Sample Shirt',type:'Everyday layering',category:'essentials',badge:'NEW',description:'A sample shirt for everyday plans.',details:'A simple sample shirt with a clean shape.',fit:'Choose your usual size.',care:'Follow the garment care label.',features:['Everyday styling','Easy layering'],gallery:['Full view','Upper detail','Fabric detail'],colors:['pictured'],sizes:['S','M'],images:{pictured:['assets/photos/core-obsidian-front.jpg']}}};
 }
+test('sales reports distinguish collected payments from outstanding COD and exclude cancelled or review payments',async(t)=>{
+  const app=await fixture(t),a=app.admin,created=[];
+  for(let i=0;i<6;i++){await a.cart();created.push((await a.order()).data.order);}
+  const now=Date.now(),day=86400000,today=Math.floor(now/day)*day;
+  const change=(index,status,payment,when)=>app.store.db.prepare('UPDATE orders SET status=?,payment_status=?,created=? WHERE id=?').run(status,payment,when,created[index].id);
+  change(0,'fulfilled','paid',today-6*day);change(1,'shipped','due_on_delivery',now-100);
+  change(2,'cancelled','paid',now-100);change(3,'payment_review','paid',now-100);
+  change(4,'fulfilled','paid',today-7*day);change(5,'awaiting_payment','pending',now-100);
+  const report=(await a.request('/api/admin/reports?days=7')).data;
+  assert.equal(report.daily.length,7);assert.equal(report.totals.orders,5);assert.equal(report.totals.activeOrders,2);
+  assert.equal(report.totals.collectedCents,created[0].totalCents);assert.equal(report.totals.outstandingCodCents,created[1].totalCents);
+  assert.equal(report.totals.paidOrders,1);assert.equal(report.totals.unitsSold,1);assert.equal(report.totals.cancelledOrders,1);assert.equal(report.totals.paymentReviewOrders,1);
+  assert.equal(report.daily[0].collectedCents,created[0].totalCents);assert.equal(report.daily[0].orders,1);
+  assert.equal(report.topProducts[0].id,'core');assert.equal(report.topProducts[0].merchandiseCents,created[0].subtotalCents);
+  assert.equal(report.daily.reduce((sum,d)=>sum+d.collectedCents,0),report.totals.collectedCents);
+  app.store.db.prepare('UPDATE products SET price_cents=99999,active=0 WHERE id=?').run('core');
+  assert.equal((await a.request('/api/admin/reports?days=7')).data.topProducts[0].merchandiseCents,created[0].subtotalCents,'Reports use historical prices even for archived products');
+  assert.equal((await a.request('/api/admin/reports?days=30')).data.totals.paidOrders,2);
+  for(const days of ['0','8','366','NaN'])assert.equal((await a.request('/api/admin/reports?days='+days)).status,400);
+  app.store.db.prepare('UPDATE orders SET created=? WHERE id=?').run(now+day,created[0].id);
+  assert.equal(salesReport(app.store.db,7,now).totals.paidOrders,0,'Future records do not enter a report');
+});
+
+test('order CSV exports match current search/status filters and protect customer cells from spreadsheet formulas',async(t)=>{
+  const app=await fixture(t),a=app.admin;await a.cart();const first=(await a.order()).data.order;
+  await a.cart();const second=(await a.order()).data.order;
+  const customer={...delivery,name:' =HYPERLINK("https://example.com")',address1:'123 Sample, Street',address2:'Suite "A"'};
+  app.store.db.prepare('UPDATE orders SET customer=?,status=? WHERE id=?').run(JSON.stringify(customer),'shipped',first.id);
+  const exported=await a.request('/api/admin/orders/export?status=shipped&q='+first.reference);
+  assert.equal(exported.status,200);assert.match(exported.headers.get('content-type'),/text\/csv/);assert.equal(exported.headers.get('cache-control'),'no-store');
+  const csv=exported.data.toString('utf8');assert(csv.includes(first.reference));assert(!csv.includes(second.reference));
+  assert(csv.includes('"\' =HYPERLINK(""https://example.com"")"'));assert(csv.includes('"123 Sample, Street"'));assert(csv.includes('"Suite ""A"""'));
+  assert.equal(csv.trim().split('\r\n').length,2);
+  assert.equal((await a.request('/api/admin/orders?q='+first.reference+'&status=shipped')).data.total,1);
+  assert.equal((await a.request('/api/admin/orders/export?status=wrong')).status,400);
+  assert.equal((await a.request('/api/admin/orders?status=wrong')).status,400);
+  assert.match(csvCell('\t=1+1'),/^"'/);assert.equal(csvCell('normal text'),'"normal text"');
+  assert.equal(app.store.db.prepare("SELECT action FROM audit_log ORDER BY id DESC LIMIT 1").get().action,'export_orders');
+});
 test('every management endpoint requires an administrator and valid CSRF tokens',async(t)=>{
   const app=await fixture(t),guest=app.client();await guest.init();
-  for(const path of ['/api/admin/overview','/api/admin/customers','/api/admin/orders','/api/admin/subscribers','/api/admin/audit'])assert.equal((await guest.request(path)).status,401,path);
+  for(const path of ['/api/admin/overview','/api/admin/customers','/api/admin/orders','/api/admin/subscribers','/api/admin/audit','/api/admin/reports','/api/admin/orders/export'])assert.equal((await guest.request(path)).status,401,path);
   for(const [path,method,body] of [['/api/admin/products','POST',sampleProduct()],['/api/admin/products/core','PATCH',{active:false}],['/api/admin/settings','PATCH',{settings:{allowCod:false},version:0}],['/api/admin/media','POST',{data:'not an image'}],['/api/admin/password','POST',{}]]){
     assert.equal((await guest.request(path,{method,body})).status,401,path);
     assert.equal((await app.admin.request(path,{method,body,headers:{'X-CSRF-Token':'invalid'}})).status,403,path);
