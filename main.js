@@ -82,7 +82,16 @@
     catch(error){toast(error.message);}
     finally{savingProducts.delete(id);syncSavedButtons();}
   }
-  window.addEventListener('aurora:saved',()=>{if(page==='shop' && $('#filter-saved')?.checked)renderCollection();syncSavedButtons();});
+  let savedSignature=(api?.savedProducts || []).join(',');
+  window.addEventListener('aurora:saved',()=>{
+    const signature=(api?.savedProducts || []).join(',');
+    if(signature!==savedSignature && page==='shop' && $('#filter-saved')?.checked) {
+      const focused=document.activeElement?.dataset.saveProduct;
+      renderCollection();
+      if(focused && !isSaved(focused)){$('#results-title').tabIndex=-1;$('#results-title').focus();}
+    }
+    savedSignature=signature;syncSavedButtons();
+  });
   $$('.shop-categories,.filters').forEach((group)=>group.insertAdjacentHTML('beforeend','<button data-filter="footwear" aria-pressed="false">Footwear <span data-category-count="footwear"></span></button>'));
   $('.mobile-nav').insertAdjacentHTML('beforeend','<a href="shop.html?category=footwear">Footwear</a>');
   if (api?.admin) $('.header-actions').insertAdjacentHTML('afterbegin','<a class="admin-nav-link" href="admin.html">Admin ↗</a>');
@@ -154,7 +163,12 @@
     const query = $('#product-search').value.trim().toLowerCase();
     const min=$('#filter-min')?.value,max=$('#filter-max')?.value,size=$('#filter-size')?.value || '',inStock=$('#filter-stock')?.checked;
     const minCents=min?Math.round(Number(min)*100):0,maxCents=max?Math.round(Number(max)*100):Infinity;
-    const valid=!['min','max'].some((key)=>$('#filter-'+key) && !$('#filter-'+key).validity.valid) && minCents<=maxCents;
+    const invalidPrice=(key)=>{
+      const control=$('#filter-'+key);if(!control)return false;
+      const value=Number(control.value);
+      return control.validity.badInput || (control.value!=='' && (!Number.isFinite(value) || value<0 || value>100000 || Math.abs(value*100-Math.round(value*100))>0.000001));
+    };
+    const valid=!['min','max'].some(invalidPrice) && minCents<=maxCents;
     if($('#filter-error')) {$('#filter-error').hidden=valid;$('#filter-error').textContent='Enter a valid price range with a maximum at least as high as the minimum.';}
     const visible = products.filter((product) => valid && (activeFilter === 'all' || product.category === activeFilter) && `${product.name} ${product.type} ${product.category}`.toLowerCase().includes(query) && (!$('#filter-saved')?.checked || isSaved(product.id)) && Math.round(product.price*100)>=minCents && Math.round(product.price*100)<=maxCents && (!size || product.sizes.includes(size)) && (!inStock || product.variants?.some((variant)=>(!size || variant.size===size) && variant.stock>0)));
     const sort = $('#product-sort')?.value;
