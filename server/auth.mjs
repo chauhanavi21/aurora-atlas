@@ -68,6 +68,7 @@ export function createAuthentication({ store, config, send, cookie, body, limit,
         } else db.prepare('UPDATE cart_items SET session_id=? WHERE session_id=?').run(rotated.session.id, current.id);
         db.prepare('UPDATE orders SET session_id=? WHERE session_id=? AND customer_id IS NULL').run(rotated.session.id, current.id);
       }
+      store.moveSavedProducts(current,rotated.session,options.detach);
       db.prepare('DELETE FROM sessions WHERE id=?').run(current.id);
       return { ...rotated, bagAdjusted };
     };
@@ -75,7 +76,7 @@ export function createAuthentication({ store, config, send, cookie, body, limit,
   }
   function authenticated(res, current, rotated, status = 200) {
     cookie(res, rotated.secret, rotated.session.expires);
-    return send(res, status, { user: publicCustomer(customer(rotated.session)), csrfToken: rotated.session.csrf, admin: Boolean(rotated.session.admin_id), bagAdjusted: rotated.bagAdjusted || false, cart: store.cart(rotated.session.id) });
+    return send(res, status, { user: publicCustomer(customer(rotated.session)), csrfToken: rotated.session.csrf, admin: Boolean(rotated.session.admin_id), savedProducts:store.savedProducts(rotated.session), bagAdjusted: rotated.bagAdjusted || false, cart: store.cart(rotated.session.id) });
   }
   function failedKey(address) { return hash('customer-login:' + address); }
   function checkFailures(address) {

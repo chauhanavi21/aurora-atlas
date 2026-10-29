@@ -90,7 +90,10 @@ export function openStore(filename, config) {
     addColumn('customers','disabled','INTEGER NOT NULL DEFAULT 0');
     addColumn('orders','tracking','TEXT NOT NULL DEFAULT \'\'');
     addColumn('orders','admin_notes','TEXT NOT NULL DEFAULT \'\'');
-    db.exec('CREATE TABLE IF NOT EXISTS store_settings (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 0); PRAGMA user_version=3;');
+    db.exec(`CREATE TABLE IF NOT EXISTS store_settings (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 0);
+      CREATE TABLE IF NOT EXISTS guest_saved_products (session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, product_id TEXT NOT NULL REFERENCES products(id), created INTEGER NOT NULL, PRIMARY KEY(session_id,product_id));
+      CREATE TABLE IF NOT EXISTS customer_saved_products (customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE, product_id TEXT NOT NULL REFERENCES products(id), created INTEGER NOT NULL, PRIMARY KEY(customer_id,product_id));
+      PRAGMA user_version=4;`);
     db.prepare('INSERT OR IGNORE INTO store_settings(id,data) VALUES(1,?)').run(JSON.stringify(defaultSettings(config)));
   });
   transaction(() => {
@@ -115,6 +118,37 @@ export function openStore(filename, config) {
     const session = { id: hash(secret), csrf: token(), admin_id: adminId, customer_id: customerId, expires: Date.now() + lifetime, cart_version: 0 };
     db.prepare('INSERT INTO sessions(id,csrf,admin_id,customer_id,expires) VALUES(?,?,?,?,?)').run(session.id, session.csrf, adminId, customerId, session.expires);
     return { secret, session };
+  }
+  function savedOwner(current) {
+    return current.customer_id ? { table:'customer_saved_products', key:'customer_id', id:current.customer_id } : { table:'guest_saved_products', key:'session_id', id:current.id };
+  }
+  function savedProducts(current) {
+    const owner = savedOwner(current);
+    return db.prepare(`SELECT s.product_id FROM ${owner.table} s JOIN products p ON p.id=s.product_id WHERE s.${owner.key}=? AND p.active=1 ORDER BY s.created DESC,s.product_id`).all(owner.id).map((row)=>row.product_id);
+  }
+  function setSavedProduct(current, id, saved) {
+    text(id,'product ID',2,64);
+    if (typeof saved !== 'boolean') throw new HttpError(400,'Choose whether to save this product.');
+    return transaction(()=>{
+      const owner = savedOwner(current);
+      if (!saved) db.prepare(`DELETE FROM ${owner.table} WHERE ${owner.key}=? AND product_id=?`).run(owner.id,id);
+      else {
+        if (!db.prepare('SELECT id FROM products WHERE id=? AND active=1').get(id)) throw new HttpError(404,'Product not found.');
+        const exists = db.prepare(`SELECT 1 FROM ${owner.table} WHERE ${owner.key}=? AND product_id=?`).get(owner.id,id);
+        if (!exists && db.prepare(`SELECT COUNT(*) AS n FROM ${owner.table} WHERE ${owner.key}=?`).get(owner.id).n >= 100) throw new HttpError(409,'You can save up to 100 products. Remove a piece before saving another.');
+        db.prepare(`INSERT OR IGNORE INTO ${owner.table} VALUES(?,?,?)`).run(owner.id,id,Date.now());
+      }
+      return savedProducts(current);
+    });
+  }
+  // Called inside session rotation's transaction. Account saves stay private on logout.
+  function moveSavedProducts(current, next, detach) {
+    if (detach || current.customer_id) return;
+    if (!next.customer_id) db.prepare('UPDATE guest_saved_products SET session_id=? WHERE session_id=?').run(next.id,current.id);
+    else db.prepare(`INSERT OR IGNORE INTO customer_saved_products(customer_id,product_id,created)
+      SELECT ?,g.product_id,g.created FROM guest_saved_products g WHERE g.session_id=?
+      AND NOT EXISTS(SELECT 1 FROM customer_saved_products c WHERE c.customer_id=? AND c.product_id=g.product_id)
+      ORDER BY g.created DESC,g.product_id LIMIT MAX(0,100-(SELECT COUNT(*) FROM customer_saved_products WHERE customer_id=?))`).run(next.customer_id,current.id,next.customer_id,next.customer_id);
   }
   function getSession(secret) {
     return secret ? db.prepare('SELECT * FROM sessions WHERE id=? AND expires>?').get(hash(secret), Date.now()) : undefined;
@@ -249,5 +283,5 @@ export function openStore(filename, config) {
       db.prepare('INSERT INTO stripe_events VALUES(?,?)').run(event.id, Date.now());
     });
   }
-  return { db, products, settings, createSession, getSession, cart, setCart, cartOwner, bumpCart, totals, placeOrder, publicOrder, releaseOrder, expireOrders, receiveStripe, transaction, colors: seed.colors, close: () => db.close() };
+  return { db, products, settings, createSession, getSession, savedProducts, setSavedProduct, moveSavedProducts, cart, setCart, cartOwner, bumpCart, totals, placeOrder, publicOrder, releaseOrder, expireOrders, receiveStripe, transaction, colors: seed.colors, close: () => db.close() };
 }

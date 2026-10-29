@@ -136,8 +136,15 @@ export function createApp(config = configuration(), dependencies = {}) {
     }
     if (path === '/api/session') limit(req, 'session', 90);
     const current = session(req, res, path === '/api/session' && req.method === 'GET');
-    if (path === '/api/session' && req.method === 'GET') return send(res, 200, { csrfToken: current.csrf, admin: Boolean(current.admin_id), user: publicCustomer(authentication.customer(current)), settings: settings() });
+    if (path === '/api/session' && req.method === 'GET') return send(res, 200, { csrfToken: current.csrf, admin: Boolean(current.admin_id), user: publicCustomer(authentication.customer(current)), savedProducts:store.savedProducts(current), settings: settings() });
     if (!['GET','HEAD'].includes(req.method)) protect(req, current);
+    if (path === '/api/saved-products' && req.method === 'GET') return send(res,200,{savedProducts:store.savedProducts(current)});
+    const savedPath = /^\/api\/saved-products\/([a-z0-9-]{2,64})$/.exec(path);
+    if (savedPath && req.method === 'PUT') {
+      limit(req,'saved-products',120);
+      const input = await body(req);
+      return send(res,200,{savedProducts:store.setSavedProduct(current,savedPath[1],input.saved)});
+    }
     if ((path.startsWith('/api/auth/') || path.startsWith('/api/account/')) && await authentication.handle(req, res, path, current)) return;
     if (path === '/api/cart' && req.method === 'GET') return send(res, 200, store.cart(current.id));
     if (path === '/api/cart' && req.method === 'PUT') {
